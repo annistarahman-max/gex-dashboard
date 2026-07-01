@@ -1,11 +1,3 @@
-[server]
-headless = false
-address = "0.0.0.0"
-port = 8501
-
-[browser]
-gatherUsageStats = false
-
 [theme]
 base = "dark"
 primaryColor = "#fbbf24"
@@ -15,3 +7,6 @@ textColor = "#e2e8f0"
 
 [client]
 toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false
