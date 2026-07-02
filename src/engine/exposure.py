@@ -8,10 +8,11 @@ Core exposures:
     VEX  — Vanna Exposure:  how delta hedge changes per 1-pt move in implied vol
     CEX  — Charm Exposure:  how delta hedge decays over one calendar day
 
-Sign convention (dealer model):
-    Market-makers are assumed to be *short* calls and *long* puts (standard retail
-    flow assumption).  Therefore call OI flips sign (+1) and put OI flips sign (−1)
-    when computing the MM's net greek exposure.
+Sign convention (dealer model — standard "naive GEX" assumption):
+    Market-makers are assumed to be *long* calls and *short* puts (retail sells
+    covered calls, buys protective puts).  Therefore calls contribute with sign +1
+    and puts with sign −1 to the MM's net greek exposure.  This is an assumption
+    about positioning, not observed data — treat levels as approximate.
 """
 
 from __future__ import annotations
@@ -74,8 +75,10 @@ def compute_exposures(
 
     df["gex"] = oi * df["bs_gamma"] * CONTRACT_MULTIPLIER * spot**2 * mm_sign * 0.01
     df["abs_gex"] = oi * df["bs_gamma"] * CONTRACT_MULTIPLIER * spot**2 * 0.01
-    df["vex"] = oi * df["bs_vanna"] * CONTRACT_MULTIPLIER * spot * mm_sign
-    df["cex"] = oi * df["bs_charm"] * CONTRACT_MULTIPLIER * spot * mm_sign
+    # VEX: dollar delta-hedge change per 1 vol-POINT move (hence * 0.01)
+    df["vex"] = oi * df["bs_vanna"] * CONTRACT_MULTIPLIER * spot * mm_sign * 0.01
+    # CEX: dollar delta-hedge decay per 1 calendar DAY (charm is per year, hence / 365)
+    df["cex"] = oi * df["bs_charm"] * CONTRACT_MULTIPLIER * spot * mm_sign / 365.0
     df["delta_exposure"] = oi * df["bs_delta"] * CONTRACT_MULTIPLIER * spot * mm_sign
 
     return df

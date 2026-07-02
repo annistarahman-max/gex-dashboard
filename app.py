@@ -257,6 +257,17 @@ REFRESH_INTERVALS = {"Off": 0, "1 min": 60, "5 min": 300, "10 min": 600, "15 min
 
 provider = get_provider()
 
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _cached_spot(tkr: str) -> float:
+    return provider.fetch_spot(tkr)
+
+
+@st.cache_data(ttl=180, show_spinner="Mengambil options chain...")
+def _cached_chain(tkr: str):
+    return provider.fetch_chain(tkr)
+
+
 ctrl_1, ctrl_2, ctrl_3, ctrl_4 = st.columns([1, 1, 1, 1])
 
 with ctrl_1:
@@ -265,16 +276,32 @@ with ctrl_1:
         help="e.g. SPY, QQQ, AAPL, TSLA, NVDA, GLD",
     ).upper()
 
-spot = provider.fetch_spot(ticker)
+spot = _cached_spot(ticker)
 ul_price, ul_label, conv_ratio = _get_conversion(ticker, spot)
 has_conversion = ul_price is not None
 
-chain = provider.fetch_chain(ticker)
+chain = _cached_chain(ticker)
+
+if chain.empty or spot <= 0:
+    st.error(
+        "⚠️ Gagal mengambil data dari Yahoo Finance (options chain kosong atau "
+        "spot = 0). Kemungkinan rate-limit, koneksi bermasalah, atau ticker tanpa "
+        "options. Tunggu 1–2 menit lalu klik Refresh Now — JANGAN ambil keputusan "
+        "trading dari tampilan ini."
+    )
+    if st.button("Refresh Now", key="refresh_empty"):
+        st.cache_data.clear()
+        st.rerun()
+    st.stop()
+
 expiry_dates = sorted(chain["expiry"].dt.date.unique())
 expiry_labels = ["All Expiries"] + [d.strftime("%Y-%m-%d") for d in expiry_dates]
 
 with ctrl_2:
-    selected_label = st.selectbox("Expiry Date", expiry_labels)
+    # Default = nearest expiry (index 1), NOT "All Expiries": summing every
+    # expiry with equal weight overstates far-dated VEX/CEX and muddies levels.
+    _default_exp_idx = 1 if len(expiry_labels) > 1 else 0
+    selected_label = st.selectbox("Expiry Date", expiry_labels, index=_default_exp_idx)
     expiry_filter = None if selected_label == "All Expiries" else selected_label
 
 with ctrl_3:
@@ -307,29 +334,43 @@ with ctrl_4:
 
 interval_sec = REFRESH_INTERVALS[auto_interval]
 if interval_sec > 0:
-    if "last_refresh" not in st.session_state:
-        st.session_state.last_refresh = time.time()
-    elapsed = time.time() - st.session_state.last_refresh
-    if elapsed >= interval_sec:
-        st.session_state.last_refresh = time.time()
-        st.cache_data.clear()
-        st.rerun()
-
-    remaining = int(interval_sec - elapsed)
-    mins, secs = divmod(remaining, 60)
-    st.caption(f"Next refresh in {mins}m {secs}s")
-
-    st.markdown(
-        f'<script>setTimeout(function(){{window.location.reload();}}, {remaining * 1000});</script>',
-        unsafe_allow_html=True,
-    )
+    try:
+        # Proper self-triggering refresh (works while page is idle).
+        # Cache freshness is handled by the ttl on _cached_spot/_cached_chain,
+        # so we do NOT clear the whole cache here.
+        from streamlit_autorefresh import st_autorefresh
+        st_autorefresh(interval=interval_sec * 1000, key="auto_refresh_timer")
+        st.caption(f"Auto refresh aktif: tiap {auto_interval}")
+    except ImportError:
+        # Fallback (old behavior): only re-checks when something else causes
+        # a rerun. Install for true idle refresh:  pip install streamlit-autorefresh
+        if "last_refresh" not in st.session_state:
+            st.session_state.last_refresh = time.time()
+        elapsed = time.time() - st.session_state.last_refresh
+        if elapsed >= interval_sec:
+            st.session_state.last_refresh = time.time()
+            st.cache_data.clear()
+            st.rerun()
+        remaining = int(interval_sec - elapsed)
+        mins, secs = divmod(remaining, 60)
+        st.caption(
+            f"Next refresh in {mins}m {secs}s — ⚠️ pasang `pip install "
+            f"streamlit-autorefresh` supaya refresh jalan otomatis saat idle"
+        )
+        st.markdown(
+            f'<script>setTimeout(function(){{window.location.reload();}}, {remaining * 1000});</script>',
+            unsafe_allow_html=True,
+        )
 
 # ── Sidebar (model params — advanced) ────────────────────────────────────────
 
 st.sidebar.markdown("## Model Params")
 st.sidebar.markdown("---")
 r = st.sidebar.slider("Risk-Free Rate", 0.0, 0.10, 0.05, 0.005, format="%.3f")
-q = st.sidebar.slider("Dividend Yield", 0.0, 0.05, 0.015, 0.005, format="%.3f")
+q = st.sidebar.slider(
+    "Dividend Yield", 0.0, 0.05, 0.0, 0.005, format="%.3f",
+    help="GLD tidak membayar dividen — biarkan 0. Naikkan hanya untuk ticker saham/ETF berdividen (mis. SPY ~0.013).",
+)
 st.sidebar.markdown("---")
 st.sidebar.markdown("### IV Alarm")
 iv_spike_threshold = st.sidebar.slider("IV Spike Threshold (poin)", 0.5, 5.0, 1.5, 0.5)

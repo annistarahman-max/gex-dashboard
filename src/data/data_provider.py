@@ -81,7 +81,7 @@ class YFinanceProvider(DataProvider):
                     "expiry": expiry_ts,
                     "option_type": opt_type,
                     "open_interest": df["openInterest"].fillna(0).astype(int),
-                    "implied_volatility": df["impliedVolatility"].fillna(0.01).astype(float),
+                    "implied_volatility": df["impliedVolatility"].astype(float),
                 })
                 rows.append(sub)
 
@@ -92,6 +92,13 @@ class YFinanceProvider(DataProvider):
 
         result = pd.concat(rows, ignore_index=True)
         result = result[result["open_interest"] > 0]
+        # Drop rows with missing/garbage IV (Yahoo's IV on illiquid strikes is
+        # often NaN, ~0, or absurdly large — these poison greeks & skew charts)
+        result = result[
+            result["implied_volatility"].notna()
+            & (result["implied_volatility"] > 0.01)
+            & (result["implied_volatility"] < 3.0)
+        ]
         return result
 
 

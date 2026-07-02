@@ -75,14 +75,15 @@ def vanna(
     S: Float, K: Float, T: Float, r: float, q: float, sigma: Float,
 ) -> Float:
     """
-    Vanna = -e^{-qT} * n(d1) * d2 / (S * σ)
+    Vanna = -e^{-qT} * n(d1) * d2 / σ
 
     Measures how delta changes when implied volatility moves — critical for
     understanding market-maker exposure to vol-spot correlation.
+    (Fixed: previous version erroneously divided by S as well.)
     """
     d1 = _d1(S, K, T, r, q, sigma)
     d2 = d1 - sigma * np.sqrt(T)
-    return -np.exp(-q * T) * norm.pdf(d1) * d2 / (S * sigma + _TINY)
+    return -np.exp(-q * T) * norm.pdf(d1) * d2 / (sigma + _TINY)
 
 
 # --------------------------------------------------------------------------- #
@@ -111,8 +112,9 @@ def charm(
         2.0 * T * sigma * sqrt_T + _TINY
     )
 
-    call_charm = common - q * discount * norm.cdf(d1)
-    put_charm = common + q * discount * norm.cdf(-d1)
+    # Haug convention: call = +q e^{-qT} N(d1) + common ; put = -q e^{-qT} N(-d1) + common
+    call_charm = common + q * discount * norm.cdf(d1)
+    put_charm = common - q * discount * norm.cdf(-d1)
 
     return np.where(is_call, call_charm, put_charm)
 
