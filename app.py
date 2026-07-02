@@ -6,6 +6,7 @@ Launch:  streamlit run app.py
 
 import time
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 import numpy as np
 import streamlit as st
 import pandas as pd
@@ -329,6 +330,10 @@ st.sidebar.markdown("## Model Params")
 st.sidebar.markdown("---")
 r = st.sidebar.slider("Risk-Free Rate", 0.0, 0.10, 0.05, 0.005, format="%.3f")
 q = st.sidebar.slider("Dividend Yield", 0.0, 0.05, 0.015, 0.005, format="%.3f")
+st.sidebar.markdown("---")
+st.sidebar.markdown("### IV Alarm")
+iv_spike_threshold = st.sidebar.slider("IV Spike Threshold (poin)", 0.5, 5.0, 1.5, 0.5)
+iv_spike_window = st.sidebar.slider("Lookback Window (menit)", 15, 120, 30, 15)
 
 
 # ── Compute ──────────────────────────────────────────────────────────────────
@@ -340,6 +345,53 @@ filtered = exposures if expiry_filter is None else exposures[
     exposures["expiry"] == pd.Timestamp(expiry_filter)
 ]
 kpi = summarize(filtered, spot)
+
+# ── ATM IV computation ────────────────────────────────────────────────────────
+
+_iv_src = filtered.copy() if len(filtered) > 0 else chain.copy()
+if len(_iv_src) > 0:
+    _iv_src = _iv_src.copy()
+    _iv_src["_dist"] = abs(_iv_src["strike"] - spot)
+    _atm_strike_iv = float(_iv_src.nsmallest(1, "_dist")["strike"].iloc[0])
+    _atm_iv_rows = _iv_src[_iv_src["strike"] == _atm_strike_iv]
+    atm_iv = float(_atm_iv_rows["implied_volatility"].mean() * 100)
+else:
+    _atm_strike_iv = spot
+    atm_iv = None
+
+# IV history: append to CSV, filter today, reset daily
+_IV_FILE = Path("iv_history.csv")
+_today_str = datetime.now(WIB).strftime("%Y-%m-%d")
+
+if _IV_FILE.exists():
+    try:
+        _iv_hist_all = pd.read_csv(_IV_FILE)
+        _iv_hist_all["timestamp"] = pd.to_datetime(_iv_hist_all["timestamp"])
+    except Exception:
+        _iv_hist_all = pd.DataFrame(columns=["timestamp", "atm_iv", "date"])
+else:
+    _iv_hist_all = pd.DataFrame(columns=["timestamp", "atm_iv", "date"])
+
+_iv_today = _iv_hist_all[_iv_hist_all.get("date", pd.Series(dtype=str)) == _today_str].copy() if "date" in _iv_hist_all.columns else pd.DataFrame(columns=["timestamp", "atm_iv", "date"])
+_iv_today = _iv_today.sort_values("timestamp") if len(_iv_today) > 0 else _iv_today
+
+_should_append_iv = True
+if len(_iv_today) > 0 and atm_iv is not None:
+    _last_iv_ts = pd.to_datetime(_iv_today["timestamp"].iloc[-1])
+    _elapsed_iv = (datetime.now(WIB).replace(tzinfo=None) - _last_iv_ts.replace(tzinfo=None)).total_seconds() / 60
+    _should_append_iv = _elapsed_iv >= 1.0
+
+if atm_iv is not None and _should_append_iv:
+    _new_iv = pd.DataFrame([{"timestamp": datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S"), "atm_iv": round(atm_iv, 4), "date": _today_str}])
+    _iv_hist_all = pd.concat([_iv_hist_all[_iv_hist_all.get("date", pd.Series(dtype=str)) == _today_str] if "date" in _iv_hist_all.columns else pd.DataFrame(), _new_iv], ignore_index=True)
+    try:
+        _iv_hist_all.to_csv(_IV_FILE, index=False)
+    except Exception:
+        pass
+    _iv_today = _iv_hist_all.copy()
+
+_iv_prev = float(_iv_today["atm_iv"].iloc[-2]) if len(_iv_today) >= 2 else None
+_iv_change = round(atm_iv - _iv_prev, 2) if (atm_iv is not None and _iv_prev is not None) else None
 
 # ── OANDA offset calculation ─────────────────────────────────────────────────
 
@@ -902,6 +954,122 @@ with col_c:
     else:
         _interp("Charm netral — tidak ada tekanan harian yang signifikan")
     st.markdown(_CARD_END, unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  1b. IMPLIED VOLATILITY (IV)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# IV spike alarm banner
+if _iv_change is not None and len(_iv_today) >= 2:
+    _now_naive = datetime.now(WIB).replace(tzinfo=None)
+    _cutoff = _now_naive - timedelta(minutes=iv_spike_window)
+    _iv_today_ts = _iv_today.copy()
+    _iv_today_ts["timestamp"] = pd.to_datetime(_iv_today_ts["timestamp"]).dt.tz_localize(None)
+    _iv_window = _iv_today_ts[_iv_today_ts["timestamp"] >= pd.Timestamp(_cutoff)]
+    if len(_iv_window) >= 2:
+        _iv_spike_val = float(_iv_today_ts["atm_iv"].iloc[-1]) - float(_iv_window["atm_iv"].iloc[0])
+        if _iv_spike_val >= iv_spike_threshold:
+            st.markdown(
+                f'<div style="background:linear-gradient(135deg,rgba(239,83,80,0.2),rgba(239,83,80,0.08));'
+                f'border:2px solid #ef5350;border-radius:12px;padding:14px 20px;margin-bottom:14px;">'
+                f'<span style="font-size:1rem;font-weight:700;color:#ef5350;">⚠️ IV Spike Terdeteksi</span>'
+                f'<span style="font-size:0.85rem;color:#d1d5db;margin-left:12px;">'
+                f'IV naik <b>+{_iv_spike_val:.2f} poin</b> dalam {iv_spike_window} menit — kemungkinan menjelang news. '
+                f'Pertimbangkan kecilkan posisi atau flat.</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+st.markdown(
+    _card_start(
+        "Implied Volatility (IV)", "📊",
+        "ATM IV intraday trend + IV skew per strike",
+        "IV Naik — Tekanan meningkat",
+        "IV Turun — Pasar tenang",
+    ),
+    unsafe_allow_html=True,
+)
+
+# ATM IV big number + badge
+if atm_iv is not None:
+    _iv_badge_color = "#ef5350" if (_iv_change and _iv_change > 0) else "#26a69a" if (_iv_change and _iv_change < 0) else "#6b7280"
+    _iv_arrow = "↑" if (_iv_change and _iv_change > 0) else "↓" if (_iv_change and _iv_change < 0) else "→"
+    _iv_badge_txt = f"{_iv_arrow} {abs(_iv_change):.2f} pts" if _iv_change is not None else "Data pertama"
+    _atm_lbl = f"${_atm_strike_iv * conv_ratio:,.0f} ({ul_label})" if has_conversion else f"${_atm_strike_iv:,.0f}"
+    st.markdown(
+        f'<div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;">'
+        f'<div><div style="font-size:0.65rem;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;">ATM IV — Strike {_atm_lbl}</div>'
+        f'<div style="font-size:2rem;font-weight:700;color:#fbbf24;line-height:1.2;">{atm_iv:.1f}%</div></div>'
+        f'<div style="background:{_iv_badge_color};color:#fff;border-radius:8px;padding:6px 14px;font-size:0.9rem;font-weight:700;">'
+        f'{_iv_badge_txt}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+col_iv1, col_iv2 = st.columns(2)
+
+with col_iv1:
+    if len(_iv_today) >= 2:
+        _iv_plot = _iv_today.copy()
+        _iv_plot["timestamp"] = pd.to_datetime(_iv_plot["timestamp"])
+        fig_iv_line = go.Figure(go.Scatter(
+            x=_iv_plot["timestamp"], y=_iv_plot["atm_iv"],
+            mode="lines+markers",
+            line=dict(color="#fbbf24", width=2),
+            marker=dict(size=5, color="#fbbf24"),
+            hovertemplate="<b>%{x|%H:%M}</b><br>IV: %{y:.2f}%<extra></extra>",
+        ))
+        fig_iv_line.update_layout(
+            xaxis_title="Waktu (WIB)", yaxis_title="ATM IV (%)",
+            showlegend=False, **_LAYOUT,
+        )
+        st.plotly_chart(fig_iv_line, key="iv_line")
+    else:
+        st.markdown(
+            '<div style="color:#6b7280;font-size:0.85rem;padding:30px 0;text-align:center;">'
+            '📡 Mengumpulkan data intraday...<br>Refresh beberapa kali untuk melihat trend IV.</div>',
+            unsafe_allow_html=True,
+        )
+
+with col_iv2:
+    _skew_src = filtered.copy() if len(filtered) > 0 else chain.copy()
+    if len(_skew_src) > 0:
+        _skew = _skew_src.groupby("strike", as_index=False)["implied_volatility"].mean()
+        _skew["iv_pct"] = _skew["implied_volatility"] * 100
+        fig_skew = go.Figure(go.Scatter(
+            x=_skew["strike"], y=_skew["iv_pct"],
+            mode="lines+markers",
+            line=dict(color="#a78bfa", width=2),
+            marker=dict(size=4, color="#a78bfa"),
+            hovertemplate="<b>Strike $%{x:,.0f}</b><br>IV: %{y:.1f}%<extra></extra>",
+        ))
+        _spot_marker(fig_skew, spot, kpi.gamma_flip)
+        _skew_cap = _skew["iv_pct"].max() * 1.15 if len(_skew) > 0 else 50
+        fig_skew.update_layout(
+            xaxis_title="Strike Price", yaxis_title="Implied Volatility (%)",
+            yaxis_range=[0, _skew_cap],
+            showlegend=False, **_LAYOUT,
+        )
+        st.plotly_chart(fig_skew, key="iv_skew")
+
+# Auto interpretation
+_iv_dir = "naik" if (_iv_change and _iv_change > 0) else "turun" if (_iv_change and _iv_change < 0) else None
+_vex_bull = kpi.total_vex > 0
+
+if _iv_dir == "turun" and _vex_bull and _is_long_gamma:
+    _iv_txt = "IV melandai + VEX positif + Long Gamma — dealer terdorong beli saat volatilitas turun. Drift naik tenang (bullish)"
+elif _iv_dir == "naik" and _is_short_gamma:
+    _iv_txt = "IV naik + Short Gamma — tekanan turun dipercepat dealer. Risiko whipsaw tinggi, kecilkan ukuran posisi"
+elif _iv_dir == "naik" and _is_long_gamma:
+    _iv_txt = "IV naik + Long Gamma — pasar antisipasi gerakan besar. Level masih dibela dealer tapi waspada perubahan rezim"
+elif _iv_dir == "turun" and not _vex_bull:
+    _iv_txt = "IV turun + VEX negatif — tekanan jual mereda tapi VEX masih bearish. Hati-hati false recovery"
+elif _iv_dir is None:
+    _iv_txt = "Mengumpulkan data intraday untuk analisis trend IV..."
+else:
+    _iv_txt = f"IV {_iv_dir} — {'Long Gamma, pasar terkendali' if _is_long_gamma else 'Short Gamma, waspadai momentum kuat'}"
+_interp(_iv_txt)
+st.markdown(_CARD_END, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  2. ABSOLUTE GAMMA — OPEN INTEREST
