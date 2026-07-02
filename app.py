@@ -298,9 +298,14 @@ expiry_dates = sorted(chain["expiry"].dt.date.unique())
 expiry_labels = ["All Expiries"] + [d.strftime("%Y-%m-%d") for d in expiry_dates]
 
 with ctrl_2:
-    # Default = nearest expiry (index 1), NOT "All Expiries": summing every
-    # expiry with equal weight overstates far-dated VEX/CEX and muddies levels.
-    _default_exp_idx = 1 if len(expiry_labels) > 1 else 0
+    # Default = nearest expiry that is still in the future (skip today's 0DTE:
+    # its greeks are tiny/degenerate late in the session and bars look empty).
+    _today_utc = pd.Timestamp.utcnow().date()
+    _future_idx = [i for i, d in enumerate(expiry_dates) if d > _today_utc]
+    if _future_idx:
+        _default_exp_idx = _future_idx[0] + 1  # +1 karena index 0 = "All Expiries"
+    else:
+        _default_exp_idx = 1 if len(expiry_labels) > 1 else 0
     selected_label = st.selectbox("Expiry Date", expiry_labels, index=_default_exp_idx)
     expiry_filter = None if selected_label == "All Expiries" else selected_label
 
@@ -425,6 +430,12 @@ if _IV_FILE.exists():
         _iv_today["timestamp"] = pd.to_datetime(_iv_today["timestamp"])
         if "date" in _iv_today.columns:
             _iv_today = _iv_today[_iv_today["date"] == _today_str]
+        # Keep only readings recorded under the SAME expiry selection — mixing
+        # expiries makes the trend jump and triggers false IV-spike alarms.
+        if "expiry" in _iv_today.columns:
+            _iv_today = _iv_today[_iv_today["expiry"] == selected_label]
+        else:
+            _iv_today = _iv_today.iloc[0:0]  # legacy file without expiry column
         _iv_today = _iv_today.sort_values("timestamp").reset_index(drop=True)
     except Exception:
         _iv_today = pd.DataFrame(columns=["timestamp", "atm_iv", "date"])
@@ -442,6 +453,7 @@ if atm_iv_raw is not None and _should_append_iv:
         "timestamp": datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S"),
         "atm_iv": round(atm_iv_raw, 4),
         "date": _today_str,
+        "expiry": selected_label,
     }])
     _iv_today = pd.concat([_iv_today, _new_iv], ignore_index=True)
     try:

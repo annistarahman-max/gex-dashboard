@@ -135,4 +135,6 @@ def time_to_maturity_years(
         now = np.datetime64("now")
     delta_days = (np.asarray(expiry, dtype="datetime64[D]")
                   - np.asarray(now, dtype="datetime64[D]")).astype(float)
-    return np.maximum(delta_days / 365.0, _TINY)
+    # Floor at half a calendar day: same-day (0DTE) options still have real
+    # intraday time value — a floor of ~0 makes all greeks collapse to zero.
+    return np.maximum(delta_days / 365.0, 0.5 / 365.0)
