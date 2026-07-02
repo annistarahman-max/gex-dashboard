@@ -340,11 +340,6 @@ filtered = exposures if expiry_filter is None else exposures[
     exposures["expiry"] == pd.Timestamp(expiry_filter)
 ]
 kpi = summarize(filtered, spot)
-if kpi.gamma_flip is None and expiry_filter is not None:
-    kpi_all = summarize(exposures, spot)
-    if kpi_all.gamma_flip is not None:
-        from dataclasses import replace
-        kpi = replace(kpi, gamma_flip=kpi_all.gamma_flip)
 
 # ── OANDA offset calculation ─────────────────────────────────────────────────
 
