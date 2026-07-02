@@ -346,54 +346,77 @@ filtered = exposures if expiry_filter is None else exposures[
 ]
 kpi = summarize(filtered, spot)
 
-# ── ATM IV computation ────────────────────────────────────────────────────────
+# ── ATM IV computation — unified interpolated + smoothed ─────────────────────
+
+def _compute_atm_iv(chain_df, ref_spot):
+    """Interpolate OI-weighted IV at exact spot from two bounding strikes."""
+    if len(chain_df) == 0:
+        return None, ref_spot
+    grp = chain_df.groupby("strike").apply(
+        lambda g: np.average(g["implied_volatility"].values,
+                             weights=g["open_interest"].clip(lower=1).values)
+    ).reset_index()
+    grp.columns = ["strike", "iv"]
+    grp = grp.sort_values("strike").reset_index(drop=True)
+    below = grp[grp["strike"] <= ref_spot]
+    above = grp[grp["strike"] >= ref_spot]
+    if len(below) == 0:
+        return float(grp["iv"].iloc[0] * 100), float(grp["strike"].iloc[0])
+    if len(above) == 0:
+        return float(grp["iv"].iloc[-1] * 100), float(grp["strike"].iloc[-1])
+    s0, iv0 = float(below.iloc[-1]["strike"]), float(below.iloc[-1]["iv"])
+    s1, iv1 = float(above.iloc[0]["strike"]), float(above.iloc[0]["iv"])
+    if s0 == s1:
+        return float(iv0 * 100), s0
+    t = (ref_spot - s0) / (s1 - s0)
+    return float((iv0 + t * (iv1 - iv0)) * 100), (s0 + s1) / 2
 
 _iv_src = filtered.copy() if len(filtered) > 0 else chain.copy()
-if len(_iv_src) > 0:
-    _iv_src = _iv_src.copy()
-    _iv_src["_dist"] = abs(_iv_src["strike"] - spot)
-    # Use top-3 nearest strikes (OI-weighted) to reduce noise from ATM shift
-    _atm_3 = _iv_src.nsmallest(6, "_dist")  # up to 3 strikes × 2 (call+put)
-    _atm_strike_iv = float(_iv_src.nsmallest(1, "_dist")["strike"].iloc[0])
-    _oi_w = _atm_3["open_interest"].clip(lower=1)
-    atm_iv = float(np.average(_atm_3["implied_volatility"].values, weights=_oi_w.values) * 100)
-else:
-    _atm_strike_iv = spot
-    atm_iv = None
+atm_iv_raw, _atm_strike_iv = _compute_atm_iv(_iv_src, spot)
 
-# IV history: append to CSV, filter today, reset daily
+# IV history CSV — save raw, display smoothed
 _IV_FILE = Path("iv_history.csv")
 _today_str = datetime.now(WIB).strftime("%Y-%m-%d")
 
 if _IV_FILE.exists():
     try:
-        _iv_hist_all = pd.read_csv(_IV_FILE)
-        _iv_hist_all["timestamp"] = pd.to_datetime(_iv_hist_all["timestamp"])
+        _iv_today = pd.read_csv(_IV_FILE)
+        _iv_today["timestamp"] = pd.to_datetime(_iv_today["timestamp"])
+        if "date" in _iv_today.columns:
+            _iv_today = _iv_today[_iv_today["date"] == _today_str]
+        _iv_today = _iv_today.sort_values("timestamp").reset_index(drop=True)
     except Exception:
-        _iv_hist_all = pd.DataFrame(columns=["timestamp", "atm_iv", "date"])
+        _iv_today = pd.DataFrame(columns=["timestamp", "atm_iv", "date"])
 else:
-    _iv_hist_all = pd.DataFrame(columns=["timestamp", "atm_iv", "date"])
-
-_iv_today = _iv_hist_all[_iv_hist_all.get("date", pd.Series(dtype=str)) == _today_str].copy() if "date" in _iv_hist_all.columns else pd.DataFrame(columns=["timestamp", "atm_iv", "date"])
-_iv_today = _iv_today.sort_values("timestamp") if len(_iv_today) > 0 else _iv_today
+    _iv_today = pd.DataFrame(columns=["timestamp", "atm_iv", "date"])
 
 _should_append_iv = True
-if len(_iv_today) > 0 and atm_iv is not None:
+if len(_iv_today) > 0 and atm_iv_raw is not None:
     _last_iv_ts = pd.to_datetime(_iv_today["timestamp"].iloc[-1])
     _elapsed_iv = (datetime.now(WIB).replace(tzinfo=None) - _last_iv_ts.replace(tzinfo=None)).total_seconds() / 60
     _should_append_iv = _elapsed_iv >= 1.0
 
-if atm_iv is not None and _should_append_iv:
-    _new_iv = pd.DataFrame([{"timestamp": datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S"), "atm_iv": round(atm_iv, 4), "date": _today_str}])
-    _iv_hist_all = pd.concat([_iv_hist_all[_iv_hist_all.get("date", pd.Series(dtype=str)) == _today_str] if "date" in _iv_hist_all.columns else pd.DataFrame(), _new_iv], ignore_index=True)
+if atm_iv_raw is not None and _should_append_iv:
+    _new_iv = pd.DataFrame([{
+        "timestamp": datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S"),
+        "atm_iv": round(atm_iv_raw, 4),
+        "date": _today_str,
+    }])
+    _iv_today = pd.concat([_iv_today, _new_iv], ignore_index=True)
     try:
-        _iv_hist_all.to_csv(_IV_FILE, index=False)
+        _iv_today.to_csv(_IV_FILE, index=False)
     except Exception:
         pass
-    _iv_today = _iv_hist_all.copy()
 
-_iv_prev = float(_iv_today["atm_iv"].iloc[-2]) if len(_iv_today) >= 2 else None
-_iv_change = round(atm_iv - _iv_prev, 2) if (atm_iv is not None and _iv_prev is not None) else None
+# Rolling median smoothing window=3 — same series used for headline AND chart
+if len(_iv_today) > 0:
+    _iv_today["atm_iv_smooth"] = _iv_today["atm_iv"].rolling(3, min_periods=1).median()
+    atm_iv = float(_iv_today["atm_iv_smooth"].iloc[-1])
+    _iv_prev_s = float(_iv_today["atm_iv_smooth"].iloc[-2]) if len(_iv_today) >= 2 else None
+    _iv_change = round(atm_iv - _iv_prev_s, 2) if _iv_prev_s is not None else None
+else:
+    atm_iv = atm_iv_raw
+    _iv_change = None
 
 # ── OANDA offset calculation ─────────────────────────────────────────────────
 
@@ -1011,11 +1034,11 @@ if atm_iv is not None:
 col_iv1, col_iv2 = st.columns(2)
 
 with col_iv1:
-    if len(_iv_today) >= 2:
+    if len(_iv_today) >= 2 and "atm_iv_smooth" in _iv_today.columns:
         _iv_plot = _iv_today.copy()
         _iv_plot["timestamp"] = pd.to_datetime(_iv_plot["timestamp"])
         fig_iv_line = go.Figure(go.Scatter(
-            x=_iv_plot["timestamp"], y=_iv_plot["atm_iv"],
+            x=_iv_plot["timestamp"], y=_iv_plot["atm_iv_smooth"],
             mode="lines+markers",
             line=dict(color="#fbbf24", width=2),
             marker=dict(size=5, color="#fbbf24"),
@@ -1045,6 +1068,10 @@ with col_iv2:
         ]
         _skew = _skew_src.groupby("strike", as_index=False)["implied_volatility"].mean()
         _skew["iv_pct"] = _skew["implied_volatility"] * 100
+        # Remove isolated spikes: exclude if > 8 poin dari rolling median tetangga
+        if len(_skew) >= 3:
+            _skew["_lmed"] = _skew["iv_pct"].rolling(3, center=True, min_periods=1).median()
+            _skew = _skew[abs(_skew["iv_pct"] - _skew["_lmed"]) <= 8.0].reset_index(drop=True)
     if len(_skew_src) > 0 and len(_skew) > 1:
         fig_skew = go.Figure(go.Scatter(
             x=_skew["strike"], y=_skew["iv_pct"],
