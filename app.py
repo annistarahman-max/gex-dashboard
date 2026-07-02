@@ -1068,10 +1068,13 @@ with col_iv2:
         ]
         _skew = _skew_src.groupby("strike", as_index=False)["implied_volatility"].mean()
         _skew["iv_pct"] = _skew["implied_volatility"] * 100
-        # Remove isolated spikes: exclude if > 8 poin dari rolling median tetangga
+        # Remove isolated spikes: exclude if > 5 poin dari rolling median tetangga
+        _skew_excluded = 0
         if len(_skew) >= 3:
             _skew["_lmed"] = _skew["iv_pct"].rolling(3, center=True, min_periods=1).median()
-            _skew = _skew[abs(_skew["iv_pct"] - _skew["_lmed"]) <= 8.0].reset_index(drop=True)
+            _mask = abs(_skew["iv_pct"] - _skew["_lmed"]) <= 5.0
+            _skew_excluded = int((~_mask).sum())
+            _skew = _skew[_mask].reset_index(drop=True)
     if len(_skew_src) > 0 and len(_skew) > 1:
         fig_skew = go.Figure(go.Scatter(
             x=_skew["strike"], y=_skew["iv_pct"],
@@ -1088,6 +1091,12 @@ with col_iv2:
             showlegend=False, **_LAYOUT,
         )
         st.plotly_chart(fig_skew, key="iv_skew")
+        if _skew_excluded > 0:
+            st.markdown(
+                f'<div style="font-size:0.72rem;color:#4b5563;margin-top:-8px;">'
+                f'⚠ {_skew_excluded} strike di-exclude (spike IV >5 poin dari median tetangga)</div>',
+                unsafe_allow_html=True,
+            )
 
 # Auto interpretation
 _iv_dir = "naik" if (_iv_change and _iv_change > 0) else "turun" if (_iv_change and _iv_change < 0) else None
