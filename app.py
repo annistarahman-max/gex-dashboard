@@ -352,9 +352,11 @@ _iv_src = filtered.copy() if len(filtered) > 0 else chain.copy()
 if len(_iv_src) > 0:
     _iv_src = _iv_src.copy()
     _iv_src["_dist"] = abs(_iv_src["strike"] - spot)
+    # Use top-3 nearest strikes (OI-weighted) to reduce noise from ATM shift
+    _atm_3 = _iv_src.nsmallest(6, "_dist")  # up to 3 strikes × 2 (call+put)
     _atm_strike_iv = float(_iv_src.nsmallest(1, "_dist")["strike"].iloc[0])
-    _atm_iv_rows = _iv_src[_iv_src["strike"] == _atm_strike_iv]
-    atm_iv = float(_atm_iv_rows["implied_volatility"].mean() * 100)
+    _oi_w = _atm_3["open_interest"].clip(lower=1)
+    atm_iv = float(np.average(_atm_3["implied_volatility"].values, weights=_oi_w.values) * 100)
 else:
     _atm_strike_iv = spot
     atm_iv = None
@@ -984,8 +986,8 @@ st.markdown(
     _card_start(
         "Implied Volatility (IV)", "📊",
         "ATM IV intraday trend + IV skew per strike",
-        "IV Naik — Tekanan meningkat",
-        "IV Turun — Pasar tenang",
+        "IV Turun — Pasar tenang (hijau)",
+        "IV Naik — Tekanan meningkat (merah)",
     ),
     unsafe_allow_html=True,
 )
@@ -1034,8 +1036,16 @@ with col_iv1:
 with col_iv2:
     _skew_src = filtered.copy() if len(filtered) > 0 else chain.copy()
     if len(_skew_src) > 0:
+        # Filter to ±12% from spot, minimum OI > 0 to remove illiquid wings
+        _skew_lo, _skew_hi = spot * 0.88, spot * 1.12
+        _skew_src = _skew_src[
+            (_skew_src["strike"] >= _skew_lo) &
+            (_skew_src["strike"] <= _skew_hi) &
+            (_skew_src["open_interest"] > 0)
+        ]
         _skew = _skew_src.groupby("strike", as_index=False)["implied_volatility"].mean()
         _skew["iv_pct"] = _skew["implied_volatility"] * 100
+    if len(_skew_src) > 0 and len(_skew) > 1:
         fig_skew = go.Figure(go.Scatter(
             x=_skew["strike"], y=_skew["iv_pct"],
             mode="lines+markers",
@@ -1044,10 +1054,10 @@ with col_iv2:
             hovertemplate="<b>Strike $%{x:,.0f}</b><br>IV: %{y:.1f}%<extra></extra>",
         ))
         _spot_marker(fig_skew, spot, kpi.gamma_flip)
-        _skew_cap = _skew["iv_pct"].max() * 1.15 if len(_skew) > 0 else 50
+        _skew_med = float(_skew["iv_pct"].median())
         fig_skew.update_layout(
-            xaxis_title="Strike Price", yaxis_title="Implied Volatility (%)",
-            yaxis_range=[0, _skew_cap],
+            xaxis_title="Strike (±12% dari spot)", yaxis_title="Implied Volatility (%)",
+            yaxis_range=[max(0, _skew_med * 0.7), _skew_med * 1.5],
             showlegend=False, **_LAYOUT,
         )
         st.plotly_chart(fig_skew, key="iv_skew")
