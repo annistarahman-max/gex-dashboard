@@ -1212,16 +1212,19 @@ def _add_zones(fig, spot, gamma_flip):
     )
 
 
-def _card_start(title, emoji, subtitle, legend_green, legend_red, hint="Hover untuk detail"):
+def _card_start(title, emoji, subtitle, legend_green=None, legend_red=None, hint="Hover untuk detail"):
+    _leg = (
+        f'<div class="card-legend">'
+        f'<span class="legend-green">{legend_green}</span>'
+        f'<span class="legend-red">{legend_red}</span></div>'
+    ) if (legend_green or legend_red) else ""
     return (
         f'<div class="card">'
         f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
         f'<div><div class="card-title">{emoji} {title}</div>'
         f'<div class="card-subtitle">{subtitle}</div></div>'
         f'<div style="font-size:0.75rem;color:#4b5563;">{hint}</div></div>'
-        f'<div class="card-legend">'
-        f'<span class="legend-green">{legend_green}</span>'
-        f'<span class="legend-red">{legend_red}</span></div>'
+        + _leg
     )
 
 
@@ -1281,31 +1284,49 @@ def _make_hover(metric_name):
 #  1. GAMMA EXPOSURE (GEX)
 # ══════════════════════════════════════════════════════════════════════════════
 
+if _k_long:
+    _gex_cl = (
+        '<span style="color:#26a69a;font-weight:700;">LONG GAMMA</span> — '
+        '<span style="color:#26a69a;">■</span> Hijau: resistance/tembok (dealer lawan arah)&emsp;'
+        '<span style="color:#ef5350;">■</span> Merah: support (acuan)')
+elif _k_short:
+    _gex_cl = (
+        '<span style="color:#ef5350;font-weight:700;">SHORT GAMMA</span> — '
+        '<span style="color:#26a69a;">■</span> Hijau: lantai/tembok yang dibela&emsp;'
+        '<span style="color:#ef5350;">■</span> Merah: lubang/celah (percepatan, BUKAN level)')
+else:
+    _gex_cl = (
+        '<span style="color:#26a69a;">■</span> Hijau: GEX positif&emsp;'
+        '<span style="color:#ef5350;">■</span> Merah: GEX negatif')
+
 st.markdown(
     _card_start(
         "Dealer Gamma Exposure (GEX)", "\U0001f525",
         "Net gamma pressure per strike — positive = resistance, negative = support",
-        "Positif — Resistance (MM Sell)",
-        "Negatif — Support (MM Buy)",
     )
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-top:8px;font-size:0.73rem;">'
-    + '<div style="color:#26a69a;font-weight:700;font-size:0.8rem;">LONG GAMMA</div>'
-    + '<div style="color:#ef5350;font-weight:700;font-size:0.8rem;">SHORT GAMMA</div>'
-    + '<div style="color:#9ca3af;font-weight:600;">Kiri Flip</div>'
-    + '<div style="color:#9ca3af;font-weight:600;">Kiri Flip</div>'
-    + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Resistance</span></div>'
-    + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Lantai (nahan jatuh)</span></div>'
-    + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Support</span></div>'
-    + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Lubang (jatuh cepat)</span></div>'
-    + '<div style="color:#9ca3af;font-weight:600;margin-top:4px;">Kanan Flip</div>'
-    + '<div style="color:#9ca3af;font-weight:600;margin-top:4px;">Kanan Flip</div>'
-    + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Resistance</span></div>'
-    + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Tembok (nahan naik)</span></div>'
-    + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Support</span></div>'
-    + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Celah (bisa naik lewat)</span></div>'
-    + '</div>',
+    + f'<div style="font-size:0.75rem;color:#9ca3af;margin-bottom:8px;">{_gex_cl}</div>',
     unsafe_allow_html=True,
 )
+with st.expander("ℹ️ Lihat semua kombinasi"):
+    st.markdown(
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:0.73rem;">'
+        + '<div style="color:#26a69a;font-weight:700;">LONG GAMMA</div>'
+        + '<div style="color:#ef5350;font-weight:700;">SHORT GAMMA</div>'
+        + '<div style="color:#9ca3af;font-weight:600;">Kiri Flip</div>'
+        + '<div style="color:#9ca3af;font-weight:600;">Kiri Flip</div>'
+        + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Resistance</span></div>'
+        + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Lantai (nahan jatuh)</span></div>'
+        + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Support</span></div>'
+        + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Lubang (jatuh cepat)</span></div>'
+        + '<div style="color:#9ca3af;font-weight:600;margin-top:4px;">Kanan Flip</div>'
+        + '<div style="color:#9ca3af;font-weight:600;margin-top:4px;">Kanan Flip</div>'
+        + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Resistance</span></div>'
+        + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Tembok (nahan naik)</span></div>'
+        + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Support</span></div>'
+        + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Celah (bisa naik lewat)</span></div>'
+        + '</div>',
+        unsafe_allow_html=True,
+    )
 
 colors_gex = ["#26a69a" if v >= 0 else "#ef5350" for v in agg["gex"]]
 customdata_gex = _build_customdata(agg["gex"].values, agg["strike"].values, spot)
@@ -1343,19 +1364,26 @@ with col_v:
         _card_start(
             "Vanna Exposure (VEX)", "\U0001f300",
             "Delta sensitivity to implied volatility changes",
-            "Positif — Magnet (tertarik)",
-            "Negatif — Tolak (diusir)",
         )
-        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-top:8px;font-size:0.73rem;">'
-        + '<div style="color:#9ca3af;font-weight:600;">Kiri Spot</div>'
-        + '<div style="color:#9ca3af;font-weight:600;">Kanan Spot</div>'
-        + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Magnet turun</span></div>'
-        + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Magnet naik</span></div>'
-        + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Tolak (lantai, nggak turun jauh)</span></div>'
-        + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Tolak (plafon, nggak naik jauh)</span></div>'
+        + '<div style="font-size:0.75rem;color:#9ca3af;margin-bottom:8px;line-height:1.7;">'
+        + '<span style="color:#26a69a;">■</span> Hijau = magnet (harga tertarik ke strike itu)&emsp;'
+        + '<span style="color:#ef5350;">■</span> Merah = penolak (harga sulit lewat)<br>'
+        + '<span style="color:#6b7280;font-size:0.7rem;">Arah efeknya mengikuti sisi spot &amp; IV — VEX bekerja saat IV berubah; IV flat = efek vanna tidur</span>'
         + '</div>',
         unsafe_allow_html=True,
     )
+    with st.expander("ℹ️ Detail"):
+        st.markdown(
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:0.73rem;">'
+            + '<div style="color:#9ca3af;font-weight:600;">Kiri Spot</div>'
+            + '<div style="color:#9ca3af;font-weight:600;">Kanan Spot</div>'
+            + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Magnet turun</span></div>'
+            + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Magnet naik</span></div>'
+            + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Tolak (lantai)</span></div>'
+            + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Tolak (plafon)</span></div>'
+            + '</div>',
+            unsafe_allow_html=True,
+        )
     colors_vex = ["#26a69a" if v >= 0 else "#ef5350" for v in agg["vex"]]
     customdata_vex = _build_customdata(agg["vex"].values, agg["strike"].values, spot, label_pos="MAGNET (Tertarik)", label_neg="TOLAK (Diusir)")
     fig_vex = go.Figure(go.Bar(
@@ -1382,11 +1410,25 @@ with col_c:
         _card_start(
             "Charm Exposure (CEX)", "⏳",
             "Daily delta decay — time-driven hedging pressure",
-            "Positif — Daily Buying",
-            "Negatif — Daily Selling",
-        ),
+        )
+        + '<div style="font-size:0.75rem;color:#9ca3af;margin-bottom:8px;line-height:1.7;">'
+        + '<span style="color:#26a69a;">■</span> Hijau = tekanan beli harian dealer&emsp;'
+        + '<span style="color:#ef5350;">■</span> Merah = tekanan jual harian<br>'
+        + '<span style="color:#6b7280;font-size:0.7rem;">Efek menguat mendekati expiry — CEX bekerja tiap hari tanpa perlu pergerakan harga</span>'
+        + '</div>',
         unsafe_allow_html=True,
     )
+    with st.expander("ℹ️ Detail"):
+        st.markdown(
+            '<div style="font-size:0.73rem;color:#9ca3af;line-height:1.8;">'
+            + '<span style="color:#26a69a;font-weight:600;">Positif (Hijau):</span> '
+            + 'Delta dealer naik seiring waktu → dealer beli underlying → bullish drift harian<br>'
+            + '<span style="color:#ef5350;font-weight:600;">Negatif (Merah):</span> '
+            + 'Delta dealer turun → dealer jual → bearish drift harian<br>'
+            + '<span style="color:#6b7280;">Besar CEX bergantung jarak ke expiry — OTM dekat expiry paling kuat</span>'
+            + '</div>',
+            unsafe_allow_html=True,
+        )
     colors_cex = ["#26a69a" if v >= 0 else "#ef5350" for v in agg["cex"]]
     customdata_cex = _build_customdata(agg["cex"].values, agg["strike"].values, spot)
     fig_cex = go.Figure(go.Bar(
