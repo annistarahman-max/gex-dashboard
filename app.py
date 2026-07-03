@@ -268,6 +268,19 @@ def _cached_chain(tkr: str):
     return provider.fetch_chain(tkr)
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def _cached_candles_1m(tkr: str) -> "pd.DataFrame":
+    try:
+        df = yf.download(tkr, period="1d", interval="1m", progress=False, auto_adjust=True)
+        if df.empty:
+            return pd.DataFrame()
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        return df.dropna(subset=["Open", "High", "Low", "Close", "Volume"])
+    except Exception:
+        return pd.DataFrame()
+
+
 ctrl_1, ctrl_2, ctrl_3, ctrl_4 = st.columns([1, 1, 1, 1])
 
 with ctrl_1:
@@ -626,13 +639,65 @@ else:
         _l3_desc = "Sinyal campur — tunggu konfirmasi lebih lanjut"
         _l3_clr  = "#6b7280"
 
-# Layers 4 & 5 — static
-_l4_label = "Tunggu footprint"
-_l4_desc  = "Candle engulfing / delta spike / absorpsi volume di level sebelum entry"
+# Layer 4 — TRIGGER (dynamic text + proxy candle indicators)
+
+# Dynamic instruction based on regime
+if _k_long:
+    _l4_label = "Cari absorption/pembalikan DI level"
+elif _k_short:
+    _l4_label = "Cari delta kelanjutan DI penembusan"
+else:
+    _l4_label = "Tunggu footprint di level kunci"
+_l4_desc = "Engulfing/delta spike/absorpsi volume di level GEX sebelum entry"
+
+# Proxy indicators from 1-min candles
+_c1m = _cached_candles_1m(ticker)
+_engulf_found = None
+_vol_ratio_k  = None
+_vol_spike_k  = False
+
+if len(_c1m) >= 3:
+    for _ci, _pi in [(-1, -2), (-2, -3)]:
+        _co = float(_c1m["Open"].iloc[_ci]);  _cc = float(_c1m["Close"].iloc[_ci])
+        _po = float(_c1m["Open"].iloc[_pi]);  _pc = float(_c1m["Close"].iloc[_pi])
+        _c_bull = _cc > _co;  _p_bull = _pc > _po
+        if _c_bull and not _p_bull and _co <= _pc and _cc >= _po:
+            _engulf_found = "Bullish"; break
+        if not _c_bull and _p_bull and _co >= _pc and _cc <= _po:
+            _engulf_found = "Bearish"; break
+
+if len(_c1m) >= 20:
+    _vol_last_k = float(_c1m["Volume"].iloc[-1])
+    _vol_avg_k  = float(_c1m["Volume"].iloc[-20:].mean())
+    if _vol_avg_k > 0:
+        _vol_ratio_k = _vol_last_k / _vol_avg_k
+        _vol_spike_k = _vol_ratio_k >= 2.0
+
+# Build proxy HTML block
+_engulf_clr = "#26a69a" if _engulf_found == "Bullish" else "#ef5350" if _engulf_found == "Bearish" else "#6b7280"
+_engulf_txt = f"{_engulf_found} engulfing ✓" if _engulf_found else "Tidak ada engulfing (3 candle)"
+_vol_clr  = "#fbbf24" if _vol_spike_k else "#9ca3af"
+_vol_txt  = (
+    f"{_vol_ratio_k:.1f}x ← SPIKE!" if _vol_spike_k
+    else (f"{_vol_ratio_k:.1f}x rata-rata 20" if _vol_ratio_k is not None else "data tidak cukup")
+)
+_proxy_extra = (
+    '<div style="margin-top:7px;padding:6px 9px;background:rgba(255,255,255,0.03);'
+    'border-radius:6px;border-left:2px solid #374151;">'
+    '<div style="font-size:0.6rem;font-weight:700;color:#4b5563;text-transform:uppercase;'
+    'letter-spacing:0.08em;margin-bottom:5px;">'
+    'PROXY (bukan footprint) — verifikasi tetap di chart footprint</div>'
+    f'<div style="display:flex;gap:18px;flex-wrap:wrap;">'
+    f'<span style="font-size:0.72rem;color:{_engulf_clr};">📊 Engulfing: {_engulf_txt}</span>'
+    f'<span style="font-size:0.72rem;color:{_vol_clr};">📦 Volume: {_vol_txt}</span>'
+    f'</div></div>'
+)
+
+# Layer 5 — static
 _l5_label = "Kelola risiko"
 _l5_desc  = "SL di luar level GEX terdekat  ·  Maks 1–2% modal  ·  Jangan averaging rugi"
 
-# Banner
+# Banner (layer 4 & 5 tidak ikut menentukan)
 _setup_ok_k = _l1_ok and _l2_ok and _l3_ok
 if _setup_ok_k:
     _banner_k = (
@@ -650,10 +715,13 @@ else:
     )
 
 
-def _krow(n, name, status, desc, color, ok):
+def _krow(n, name, status, desc, color, ok, icon=None, extra=""):
     dot_bg = f"{color}22"
-    chk_clr = color if ok else "#4b5563"
-    chk_sym = "✓" if ok else "—"
+    if icon is not None:
+        chk_sym, chk_clr = icon, "#9ca3af"
+    else:
+        chk_sym = "✓" if ok else "—"
+        chk_clr = color if ok else "#4b5563"
     return (
         f'<div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;'
         f'border-bottom:1px solid rgba(255,255,255,0.05);">'
@@ -665,7 +733,8 @@ def _krow(n, name, status, desc, color, ok):
         f'letter-spacing:0.1em;margin-bottom:3px;">{name}</div>'
         f'<div style="font-size:0.82rem;font-weight:700;color:{color};">{status}</div>'
         f'</div>'
-        f'<div style="flex:1;font-size:0.74rem;color:#9ca3af;line-height:1.5;padding-top:3px;">{desc}</div>'
+        f'<div style="flex:1;font-size:0.74rem;color:#9ca3af;line-height:1.5;padding-top:3px;">'
+        f'{desc}{extra}</div>'
         f'<div style="flex:0 0 18px;font-size:1rem;font-weight:700;color:{chk_clr};'
         f'text-align:right;padding-top:3px;flex-shrink:0;">{chk_sym}</div>'
         f'</div>'
@@ -682,7 +751,7 @@ st.markdown(
     + _krow(1, "REZIM",   _l1_label, _l1_desc, _l1_clr, _l1_ok)
     + _krow(2, "LOKASI",  _l2_label, _l2_desc, _l2_clr, _l2_ok)
     + _krow(3, "DRIFT",   _l3_label, _l3_desc, _l3_clr, _l3_ok)
-    + _krow(4, "TRIGGER", _l4_label, _l4_desc, "#6b7280", True)
+    + _krow(4, "TRIGGER", _l4_label, _l4_desc, "#6b7280", True, icon="👁", extra=_proxy_extra)
     + _krow(5, "RISIKO",  _l5_label, _l5_desc, "#6b7280", True)
     + '</div>',
     unsafe_allow_html=True,
