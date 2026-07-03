@@ -589,20 +589,138 @@ _spot_ref_k  = _kprice(spot)
 def _kfmt(v):
     return f"${v:,.0f}" if v is not None else "N/A"
 
+# Raw GLD-denominated values for snapshot (before broker conversion)
+_wall_strike_raw = float(_wall_df_k["strike"].iloc[0]) if len(_wall_df_k) > 0 else None
+_wall_gex_raw    = float(_wall_df_k["gex"].iloc[0])    if len(_wall_df_k) > 0 else None
+_hole_strike_raw = float(_hole_df_k["strike"].iloc[0]) if len(_hole_df_k) > 0 else None
+_hole_gex_raw    = float(_hole_df_k["gex"].iloc[0])    if len(_hole_df_k) > 0 else None
+
+# OI at the level strikes from filtered chain
+def _oi_at_k(strike, opt_type):
+    if strike is None or len(filtered) == 0:
+        return 0
+    mask = (filtered["strike"] == strike) & (filtered["option_type"].str.lower() == opt_type)
+    return int(filtered[mask]["open_interest"].sum())
+
+_wall_call_oi_k   = _oi_at_k(_wall_strike_raw, "call")
+_support_put_oi_k = _oi_at_k(_hole_strike_raw, "put")
+
+# ── GEX snapshot: load → compare → save (1 row per day, overwrite) ──────────
+_GEX_HIST = Path("gex_history.csv")
+_yesterday_str = (datetime.now(WIB) - timedelta(days=1)).strftime("%Y-%m-%d")
+
+try:
+    _gex_hist_df = pd.read_csv(_GEX_HIST) if _GEX_HIST.exists() else pd.DataFrame()
+except Exception:
+    _gex_hist_df = pd.DataFrame()
+
+# Yesterday's row for badge comparison
+_yest_row = None
+if len(_gex_hist_df) > 0 and "date" in _gex_hist_df.columns:
+    _yest_rows = _gex_hist_df[_gex_hist_df["date"] == _yesterday_str]
+    if len(_yest_rows) > 0:
+        _yest_row = _yest_rows.iloc[-1]
+
+# Overwrite today's snapshot
+_gex_snap_new = pd.DataFrame([{
+    "timestamp":     datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S"),
+    "date":          _today_str,
+    "wall_strike":   _wall_strike_raw,
+    "wall_gex":      round(_wall_gex_raw, 2)   if _wall_gex_raw   is not None else None,
+    "wall_call_oi":  _wall_call_oi_k,
+    "support_strike":_hole_strike_raw,
+    "support_gex":   round(_hole_gex_raw, 2)   if _hole_gex_raw   is not None else None,
+    "support_put_oi":_support_put_oi_k,
+    "gamma_flip":    round(float(kpi.gamma_flip), 4) if kpi.gamma_flip else None,
+}])
+if len(_gex_hist_df) > 0 and "date" in _gex_hist_df.columns:
+    _gex_hist_df = _gex_hist_df[_gex_hist_df["date"] != _today_str]
+_gex_hist_df = pd.concat([_gex_hist_df, _gex_snap_new], ignore_index=True)
+try:
+    _gex_hist_df.to_csv(_GEX_HIST, index=False)
+except Exception:
+    pass
+
+# ── Change badge per level ────────────────────────────────────────────────────
+def _level_badge(curr_strike, curr_gex, yest_strike_col, yest_gex_col):
+    """(badge_html, pct_float_or_None) — compares abs(GEX) vs yesterday."""
+    _na = '<span style="color:#4b5563;font-size:0.67rem;">(belum ada pembanding)</span>'
+    if _yest_row is None:
+        return _na, None
+    try:
+        y_gex = float(_yest_row[yest_gex_col])
+        assert not pd.isna(y_gex)
+    except Exception:
+        return _na, None
+    if curr_strike is None or curr_gex is None:
+        return '<span style="color:#4b5563;font-size:0.67rem;">(level hilang)</span>', None
+    try:
+        y_strike = float(_yest_row[yest_strike_col])
+    except Exception:
+        y_strike = None
+    # Strike shifted to a different level
+    if y_strike is not None and not pd.isna(y_strike) and abs(y_strike - curr_strike) > 0.01:
+        return (
+            f'<span style="color:#9ca3af;font-size:0.67rem;">'
+            f'(bergeser dari {_kfmt(_kprice(y_strike))})</span>'
+        ), None
+    if abs(y_gex) < 1e-6:
+        return '<span style="color:#6b7280;font-size:0.67rem;">(baru)</span>', None
+    pct = (abs(curr_gex) - abs(y_gex)) / abs(y_gex) * 100
+    clr = "#26a69a" if pct >= 0 else "#ef5350"
+    sym = "▲" if pct >= 0 else "▼"
+    sgn = "+" if pct >= 0 else ""
+    return (
+        f'<span style="color:{clr};font-size:0.67rem;">({sym} {sgn}{pct:.0f}%)</span>'
+    ), pct
+
+_wall_badge, _wall_pct = _level_badge(_wall_strike_raw, _wall_gex_raw, "wall_strike",    "wall_gex")
+_hole_badge, _hole_pct = _level_badge(_hole_strike_raw, _hole_gex_raw, "support_strike", "support_gex")
+
+# Flip movement badge
+_flip_badge = ""
+if _yest_row is not None and kpi.gamma_flip is not None:
+    try:
+        _y_flip = float(_yest_row["gamma_flip"])
+        if not pd.isna(_y_flip) and abs(_y_flip - float(kpi.gamma_flip)) > 0.01:
+            _flip_badge = (
+                f' <span style="color:#9ca3af;font-size:0.67rem;">'
+                f'(geser dari {_kfmt(_kprice(_y_flip))})</span>'
+            )
+    except Exception:
+        pass
+
+# Conditional thinning warning — informational only, does NOT affect banner
+_l2_warning_html = ""
+for _lv_xau, _lv_pct in [(_wall_xau_k, _wall_pct), (_hole_xau_k, _hole_pct)]:
+    if _lv_xau is None or _lv_pct is None:
+        continue
+    if _lv_pct <= -20 and abs(_spot_ref_k - _lv_xau) / _spot_ref_k * 100 < 0.5:
+        _l2_warning_html = (
+            '<div style="margin-top:7px;padding:6px 10px;'
+            'background:rgba(251,191,36,0.08);border-radius:6px;'
+            'border-left:2px solid #fbbf24;">'
+            '<span style="font-size:0.71rem;color:#fbbf24;">⚠ Level terdekat menipis — '
+            'keandalan berkurang, verifikasi footprint lebih ketat</span></div>'
+        )
+        break
+
+# Level string with inline badges
+_l2_levels_html = (
+    f'Tembok: {_kfmt(_wall_xau_k)}&nbsp;{_wall_badge}&emsp;'
+    f'Support: {_kfmt(_hole_xau_k)}&nbsp;{_hole_badge}&emsp;'
+    f'Flip: {_kfmt(_flip_xau_k)}{_flip_badge}'
+)
+
 _key_levels_k = [l for l in [_wall_xau_k, _hole_xau_k, _flip_xau_k] if l is not None]
 _at_level_k   = any(abs(_spot_ref_k - l) <= _spot_ref_k * 0.003 for l in _key_levels_k)
-_l2_levels_str = (
-    f"Tembok: {_kfmt(_wall_xau_k)}  ·  "
-    f"Support: {_kfmt(_hole_xau_k)}  ·  "
-    f"Flip: {_kfmt(_flip_xau_k)}"
-)
 if _at_level_k:
     _l2_ok, _l2_label = True,  "⚡ HARGA DI LEVEL"
-    _l2_desc = f"{_l2_levels_str} — Siap konfirmasi footprint"
+    _l2_desc = f"{_l2_levels_html} — Siap konfirmasi footprint"
     _l2_clr  = "#fbbf24"
 else:
     _l2_ok, _l2_label = False, "NO TRADE ZONE"
-    _l2_desc = f"{_l2_levels_str} — Harga di tengah, tunggu mendekati level"
+    _l2_desc = f"{_l2_levels_html} — Harga di tengah, tunggu mendekati level"
     _l2_clr  = "#6b7280"
 
 # Layer 3 — DRIFT (IV 30 menit + VEX + CEX)
@@ -769,7 +887,7 @@ st.markdown(
     '</div>'
     + _banner_k
     + _krow(1, "REZIM",   _l1_label, _l1_desc, _l1_clr, _l1_ok)
-    + _krow(2, "LOKASI",  _l2_label, _l2_desc, _l2_clr, _l2_ok)
+    + _krow(2, "LOKASI",  _l2_label, _l2_desc, _l2_clr, _l2_ok, extra=_l2_warning_html)
     + _krow(3, "DRIFT",   _l3_label, _l3_desc, _l3_clr, _l3_ok)
     + _krow(4, "TRIGGER", _l4_label, _l4_desc, "#6b7280", True, icon="👁", extra=_proxy_extra)
     + _krow(5, "RISIKO",  _l5_label, _l5_desc, "#6b7280", True)
