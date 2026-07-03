@@ -461,6 +461,12 @@ if len(_iv_today) > 0 and atm_iv_raw is not None:
     _elapsed_iv = (datetime.now(WIB).replace(tzinfo=None) - _last_iv_ts.replace(tzinfo=None)).total_seconds() / 60
     _should_append_iv = _elapsed_iv >= 1.0
 
+# Reject outlier: if ≥5 prior readings exist and new value deviates >5pt from their median
+if _should_append_iv and atm_iv_raw is not None and len(_iv_today) >= 5:
+    _iv_ref_median = float(_iv_today["atm_iv"].iloc[-5:].median())
+    if abs(atm_iv_raw - _iv_ref_median) > 5.0:
+        _should_append_iv = False
+
 if atm_iv_raw is not None and _should_append_iv:
     _new_iv = pd.DataFrame([{
         "timestamp": datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S"),
