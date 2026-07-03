@@ -578,7 +578,8 @@ _wall_df_k   = _agg_above_k[_agg_above_k["gex"] > 0].nlargest(1, "gex")
 _hole_df_k   = _agg_below_k[_agg_below_k["gex"] < 0].nsmallest(1, "gex")
 
 def _kprice(strike):
-    return strike * conv_ratio if has_conversion else strike
+    xau = strike * conv_ratio if has_conversion else strike
+    return _to_oanda(xau)
 
 _wall_xau_k = _kprice(float(_wall_df_k["strike"].iloc[0])) if len(_wall_df_k) > 0 else None
 _hole_xau_k = _kprice(float(_hole_df_k["strike"].iloc[0])) if len(_hole_df_k) > 0 else None
