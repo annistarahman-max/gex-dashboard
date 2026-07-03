@@ -272,7 +272,7 @@ ctrl_1, ctrl_2, ctrl_3, ctrl_4 = st.columns([1, 1, 1, 1])
 
 with ctrl_1:
     ticker = st.text_input(
-        "Ticker Symbol", value="SPY", max_chars=10,
+        "Ticker Symbol", value="GLD", max_chars=10,
         help="e.g. SPY, QQQ, AAPL, TSLA, NVDA, GLD",
     ).upper()
 
