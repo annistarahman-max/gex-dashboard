@@ -521,6 +521,174 @@ def _fmt_short(v):
     return f"${v:+,.0f}"
 
 
+# ── Panel KEPUTUSAN ──────────────────────────────────────────────────────────
+
+# Layer 1 — REZIM
+_k_long  = kpi.gamma_flip is not None and spot > kpi.gamma_flip
+_k_short = kpi.gamma_flip is not None and spot <= kpi.gamma_flip
+if _k_long:
+    _l1_ok, _l1_label = True,  "✅ LONG GAMMA"
+    _l1_desc = "Boleh limit order di level GEX hijau — dealer stabilkan range"
+    _l1_clr  = "#26a69a"
+elif _k_short:
+    _l1_ok, _l1_label = True,  "⚠ SHORT GAMMA"
+    _l1_desc = "Hanya momentum — dilarang counter-trend entry"
+    _l1_clr  = "#ef5350"
+else:
+    _l1_ok, _l1_label = False, "⚫ NEUTRAL"
+    _l1_desc = "Flip tidak terdeteksi — data tidak cukup"
+    _l1_clr  = "#fbbf24"
+
+# Layer 2 — LOKASI
+_agg_above_k = agg[agg["strike"] > spot]
+_agg_below_k = agg[agg["strike"] < spot]
+_wall_df_k   = _agg_above_k[_agg_above_k["gex"] > 0].nlargest(1, "gex")
+_hole_df_k   = _agg_below_k[_agg_below_k["gex"] < 0].nsmallest(1, "gex")
+
+def _kprice(strike):
+    return strike * conv_ratio if has_conversion else strike
+
+_wall_xau_k = _kprice(float(_wall_df_k["strike"].iloc[0])) if len(_wall_df_k) > 0 else None
+_hole_xau_k = _kprice(float(_hole_df_k["strike"].iloc[0])) if len(_hole_df_k) > 0 else None
+_flip_xau_k = _kprice(kpi.gamma_flip) if kpi.gamma_flip else None
+_spot_ref_k  = _kprice(spot)
+
+def _kfmt(v):
+    return f"${v:,.0f}" if v is not None else "N/A"
+
+_key_levels_k = [l for l in [_wall_xau_k, _hole_xau_k, _flip_xau_k] if l is not None]
+_at_level_k   = any(abs(_spot_ref_k - l) <= _spot_ref_k * 0.003 for l in _key_levels_k)
+_l2_levels_str = (
+    f"Tembok: {_kfmt(_wall_xau_k)}  ·  "
+    f"Support: {_kfmt(_hole_xau_k)}  ·  "
+    f"Flip: {_kfmt(_flip_xau_k)}"
+)
+if _at_level_k:
+    _l2_ok, _l2_label = True,  "⚡ HARGA DI LEVEL"
+    _l2_desc = f"{_l2_levels_str} — Siap konfirmasi footprint"
+    _l2_clr  = "#fbbf24"
+else:
+    _l2_ok, _l2_label = False, "NO TRADE ZONE"
+    _l2_desc = f"{_l2_levels_str} — Harga di tengah, tunggu mendekati level"
+    _l2_clr  = "#6b7280"
+
+# Layer 3 — DRIFT (IV 30 menit + VEX + CEX)
+_iv_dir_k, _iv_pts_k = "flat", 0.0
+if len(_iv_today) >= 2 and "atm_iv_smooth" in _iv_today.columns:
+    _ts_k    = pd.to_datetime(_iv_today["timestamp"])
+    _now_k   = datetime.now(WIB).replace(tzinfo=None)
+    _old_k   = _iv_today[(_ts_k <= (_now_k - timedelta(minutes=30))).values]
+    if len(_old_k) > 0:
+        _iv_pts_k = float(_iv_today["atm_iv_smooth"].iloc[-1]) - float(_old_k["atm_iv_smooth"].iloc[-1])
+        if abs(_iv_pts_k) > 0.3:
+            _iv_dir_k = "naik" if _iv_pts_k > 0 else "turun"
+
+_vex_bull_k = kpi.total_vex > 0
+_cex_bull_k = kpi.total_cex > 0
+_iv_bull_k  = (_iv_dir_k == "turun")
+_iv_bear_k  = (_iv_dir_k == "naik")
+
+if _iv_dir_k == "flat":
+    _n_b2 = sum([_vex_bull_k, _cex_bull_k])
+    if _n_b2 == 2:
+        _l3_ok, _l3_label = True,  "Bias BUY lemah"
+        _l3_desc = f"VEX & CEX bullish — IV flat ({_iv_pts_k:+.2f}pt, <0.3pt)"
+        _l3_clr  = "#26a69a"
+    elif _n_b2 == 0:
+        _l3_ok, _l3_label = True,  "Bias SELL lemah"
+        _l3_desc = f"VEX & CEX bearish — IV flat ({_iv_pts_k:+.2f}pt, <0.3pt)"
+        _l3_clr  = "#ef5350"
+    else:
+        _l3_ok, _l3_label = False, "Netral"
+        _l3_desc = "Sinyal campur — IV flat, VEX/CEX berlawanan"
+        _l3_clr  = "#6b7280"
+else:
+    _nb3 = sum([_iv_bull_k, _vex_bull_k, _cex_bull_k])
+    _ns3 = sum([_iv_bear_k, not _vex_bull_k, not _cex_bull_k])
+    if _nb3 == 3:
+        _l3_ok, _l3_label = True,  "Bias BUY kuat"
+        _l3_desc = f"IV turun {abs(_iv_pts_k):.1f}pt + VEX bull + CEX bull — 3/3 searah"
+        _l3_clr  = "#26a69a"
+    elif _nb3 == 2:
+        _l3_ok, _l3_label = True,  "Bias BUY lemah"
+        _l3_desc = f"2/3 sinyal bullish — IV {_iv_dir_k} {abs(_iv_pts_k):.1f}pt"
+        _l3_clr  = "#26a69a"
+    elif _ns3 == 3:
+        _l3_ok, _l3_label = True,  "Bias SELL kuat"
+        _l3_desc = f"IV naik {abs(_iv_pts_k):.1f}pt + VEX bear + CEX bear — 3/3 searah"
+        _l3_clr  = "#ef5350"
+    elif _ns3 == 2:
+        _l3_ok, _l3_label = True,  "Bias SELL lemah"
+        _l3_desc = f"2/3 sinyal bearish — IV {_iv_dir_k} {abs(_iv_pts_k):.1f}pt"
+        _l3_clr  = "#ef5350"
+    else:
+        _l3_ok, _l3_label = False, "Netral"
+        _l3_desc = "Sinyal campur — tunggu konfirmasi lebih lanjut"
+        _l3_clr  = "#6b7280"
+
+# Layers 4 & 5 — static
+_l4_label = "Tunggu footprint"
+_l4_desc  = "Candle engulfing / delta spike / absorpsi volume di level sebelum entry"
+_l5_label = "Kelola risiko"
+_l5_desc  = "SL di luar level GEX terdekat  ·  Maks 1–2% modal  ·  Jangan averaging rugi"
+
+# Banner
+_setup_ok_k = _l1_ok and _l2_ok and _l3_ok
+if _setup_ok_k:
+    _banner_k = (
+        '<div style="background:rgba(38,166,154,0.15);border:2px solid #26a69a;border-radius:10px;'
+        'padding:11px 18px;margin-bottom:14px;text-align:center;">'
+        '<span style="font-size:0.95rem;font-weight:700;color:#26a69a;letter-spacing:0.04em;">'
+        '✅ SETUP LENGKAP — Lanjut ke konfirmasi entry</span></div>'
+    )
+else:
+    _banner_k = (
+        '<div style="background:rgba(75,85,99,0.25);border:2px solid #4b5563;border-radius:10px;'
+        'padding:11px 18px;margin-bottom:14px;text-align:center;">'
+        '<span style="font-size:0.95rem;font-weight:700;color:#9ca3af;letter-spacing:0.04em;">'
+        '⛔ SETUP BELUM LENGKAP — JANGAN ENTRY</span></div>'
+    )
+
+
+def _krow(n, name, status, desc, color, ok):
+    dot_bg = f"{color}22"
+    chk_clr = color if ok else "#4b5563"
+    chk_sym = "✓" if ok else "—"
+    return (
+        f'<div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;'
+        f'border-bottom:1px solid rgba(255,255,255,0.05);">'
+        f'<div style="flex:0 0 22px;height:22px;border-radius:50%;background:{dot_bg};'
+        f'display:flex;align-items:center;justify-content:center;font-size:0.7rem;'
+        f'font-weight:700;color:{color};margin-top:1px;flex-shrink:0;">{n}</div>'
+        f'<div style="flex:0 0 92px;flex-shrink:0;">'
+        f'<div style="font-size:0.62rem;font-weight:700;color:#6b7280;text-transform:uppercase;'
+        f'letter-spacing:0.1em;margin-bottom:3px;">{name}</div>'
+        f'<div style="font-size:0.82rem;font-weight:700;color:{color};">{status}</div>'
+        f'</div>'
+        f'<div style="flex:1;font-size:0.74rem;color:#9ca3af;line-height:1.5;padding-top:3px;">{desc}</div>'
+        f'<div style="flex:0 0 18px;font-size:1rem;font-weight:700;color:{chk_clr};'
+        f'text-align:right;padding-top:3px;flex-shrink:0;">{chk_sym}</div>'
+        f'</div>'
+    )
+
+
+st.markdown(
+    '<div class="card" style="margin-bottom:14px;">'
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
+    '<div class="card-title" style="margin:0;">🎯 Keputusan Trading</div>'
+    '<div style="font-size:0.72rem;color:#6b7280;">5-lapis · auto dari data realtime</div>'
+    '</div>'
+    + _banner_k
+    + _krow(1, "REZIM",   _l1_label, _l1_desc, _l1_clr, _l1_ok)
+    + _krow(2, "LOKASI",  _l2_label, _l2_desc, _l2_clr, _l2_ok)
+    + _krow(3, "DRIFT",   _l3_label, _l3_desc, _l3_clr, _l3_ok)
+    + _krow(4, "TRIGGER", _l4_label, _l4_desc, "#6b7280", True)
+    + _krow(5, "RISIKO",  _l5_label, _l5_desc, "#6b7280", True)
+    + '</div>',
+    unsafe_allow_html=True,
+)
+
+
 # ── Market Regime Badge ──────────────────────────────────────────────────────
 
 if kpi.gamma_flip and spot > kpi.gamma_flip:
