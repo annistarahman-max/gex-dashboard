@@ -461,11 +461,23 @@ if len(_iv_today) > 0 and atm_iv_raw is not None:
     _elapsed_iv = (datetime.now(WIB).replace(tzinfo=None) - _last_iv_ts.replace(tzinfo=None)).total_seconds() / 60
     _should_append_iv = _elapsed_iv >= 1.0
 
-# Reject outlier: if ≥5 prior readings exist and new value deviates >5pt from their median
+# Reject outlier: if ≥5 prior readings exist and new value deviates >5pt from their median.
+# Exception: if 3 consecutive rejections all cluster within 2pt of each other, treat it as a
+# genuine IV level shift (news event) and accept the reading.
+if "_iv_reject_buf" not in st.session_state:
+    st.session_state._iv_reject_buf = []
+
 if _should_append_iv and atm_iv_raw is not None and len(_iv_today) >= 5:
     _iv_ref_median = float(_iv_today["atm_iv"].iloc[-5:].median())
     if abs(atm_iv_raw - _iv_ref_median) > 5.0:
-        _should_append_iv = False
+        st.session_state._iv_reject_buf.append(atm_iv_raw)
+        _rbuf = st.session_state._iv_reject_buf
+        if len(_rbuf) >= 3 and (max(_rbuf[-3:]) - min(_rbuf[-3:])) < 2.0:
+            _should_append_iv = True   # genuine level shift — override
+        else:
+            _should_append_iv = False
+    else:
+        st.session_state._iv_reject_buf = []   # clean reading resets counter
 
 if atm_iv_raw is not None and _should_append_iv:
     _new_iv = pd.DataFrame([{
@@ -479,6 +491,7 @@ if atm_iv_raw is not None and _should_append_iv:
         _iv_today.to_csv(_IV_FILE, index=False)
     except Exception:
         pass
+    st.session_state._iv_reject_buf = []   # reset after successful write
 
 # Rolling median smoothing window=3 — same series used for headline AND chart
 if len(_iv_today) > 0:
