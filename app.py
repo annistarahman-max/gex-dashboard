@@ -1580,7 +1580,7 @@ with col_iv1:
         ))
         fig_iv_line.update_layout(
             xaxis_title="Waktu (WIB)", yaxis_title="ATM IV (%)",
-            showlegend=False, yaxis_fixedrange=True, **_LAYOUT,
+            showlegend=False, **_LAYOUT,
         )
         st.plotly_chart(fig_iv_line, key="iv_line", config={"displayModeBar": "hover", "displaylogo": False, "scrollZoom": False, "editable": False, "edits": {"axisTitleText": False, "titleText": False}, "modeBarButtonsToRemove": ["lasso2d", "select2d"]})
     else:
@@ -1622,7 +1622,7 @@ with col_iv2:
         fig_skew.update_layout(
             xaxis_title="Strike (±12% dari spot)", yaxis_title="Implied Volatility (%)",
             yaxis_range=[max(0, _skew_med * 0.7), _skew_med * 1.5],
-            showlegend=False, yaxis_fixedrange=True, **_LAYOUT,
+            showlegend=False, **_LAYOUT,
         )
         st.plotly_chart(fig_skew, key="iv_skew", config={"displayModeBar": "hover", "displaylogo": False, "scrollZoom": False, "editable": False, "edits": {"axisTitleText": False, "titleText": False}, "modeBarButtonsToRemove": ["lasso2d", "select2d"]})
         if _skew_excluded > 0:
