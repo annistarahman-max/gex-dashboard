@@ -4,6 +4,7 @@ Options Market-Maker Exposure Dashboard
 Launch:  streamlit run app.py
 """
 
+import contextlib
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -381,6 +382,14 @@ if interval_sec > 0:
         )
 
 # ── Sidebar (model params — advanced) ────────────────────────────────────────
+
+st.sidebar.markdown("---")
+mode_fokus = st.sidebar.checkbox(
+    "Mode Fokus",
+    value=True,
+    help="ON: hanya tampilkan panel utama. OFF: buka semua panel.",
+)
+st.sidebar.markdown("---")
 
 st.sidebar.markdown("## Model Params")
 st.sidebar.markdown("---")
@@ -962,15 +971,16 @@ sup_items = "".join(
 
 flip_item = f'<div class="level-item yellow">{_level_str(kpi.gamma_flip)}</div>' if kpi.gamma_flip else '<div class="level-item" style="color:#4b5563;">N/A</div>'
 
-st.markdown(
-    f'<div class="levels-row">'
-    f'<div class="level-box"><div class="level-title">Resistance (MM Sell)</div>{res_items}</div>'
-    f'<div class="level-box"><div class="level-title">Support (MM Buy)</div>{sup_items}</div>'
-    f'<div class="level-box"><div class="level-title">Gamma Flip</div>{flip_item}'
-    f'<div class="level-sub" style="margin-top:8px;">Di atas = stabil<br>Di bawah = volatile</div></div>'
-    f'</div>',
-    unsafe_allow_html=True,
-)
+with st.expander("🎯 Level Kunci Detail", expanded=not mode_fokus):
+    st.markdown(
+        f'<div class="levels-row">'
+        f'<div class="level-box"><div class="level-title">Resistance (MM Sell)</div>{res_items}</div>'
+        f'<div class="level-box"><div class="level-title">Support (MM Buy)</div>{sup_items}</div>'
+        f'<div class="level-box"><div class="level-title">Gamma Flip</div>{flip_item}'
+        f'<div class="level-sub" style="margin-top:8px;">Di atas = stabil<br>Di bawah = volatile</div></div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
 # ── Signal Filter ────────────────────────────────────────────────────────────
 
@@ -989,20 +999,6 @@ signal_items = "".join(
     f'<div class="signal-item {"buy-item" if is_buy else "sell-item"}">'
     f'<span>{name}</span><span>{"BUY" if is_buy else "SELL"}</span></div>'
     for name, is_buy in _signals
-)
-
-st.markdown(
-    f'<div class="signal-box">'
-    f'<div class="signal-header">'
-    f'<div class="signal-title">\U0001f3af Signal Filter</div>'
-    f'<div class="signal-count">'
-    f'<span class="buy">BUY ({_buy_count}/{len(_signals)})</span>'
-    f' &middot; '
-    f'<span class="sell">SELL ({_sell_count}/{len(_signals)})</span>'
-    f'</div></div>'
-    f'<div class="signal-detail">{signal_items}</div>'
-    f'</div>',
-    unsafe_allow_html=True,
 )
 
 # ── Trading Guide ────────────────────────────────────────────────────────────
@@ -1076,14 +1072,29 @@ if _flip_price:
 levels_html += f'<div class="guide-level-box"><div class="guide-level-label">Spot Now</div><div class="guide-level-val" style="color:#e2e8f0;">${spot * conv_ratio:,.0f}</div></div>'
 levels_html += '</div>'
 
-st.markdown(
-    f'<div class="guide-box {_guide_class}">'
-    f'<div class="guide-title" style="color:{_guide_color};">{_guide_emoji} {_guide_title}</div>'
-    f'{steps_html}'
-    f'{levels_html}'
-    f'</div>',
-    unsafe_allow_html=True,
-)
+with st.expander("🧪 Sinyal Legacy (referensi)", expanded=not mode_fokus):
+    st.caption("Panel lama — keputusan resmi ada di panel Keputusan 5 lapis")
+    st.markdown(
+        f'<div class="signal-box">'
+        f'<div class="signal-header">'
+        f'<div class="signal-title">\U0001f3af Signal Filter</div>'
+        f'<div class="signal-count">'
+        f'<span class="buy">BUY ({_buy_count}/{len(_signals)})</span>'
+        f' &middot; '
+        f'<span class="sell">SELL ({_sell_count}/{len(_signals)})</span>'
+        f'</div></div>'
+        f'<div class="signal-detail">{signal_items}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<div class="guide-box {_guide_class}">'
+        f'<div class="guide-title" style="color:{_guide_color};">{_guide_emoji} {_guide_title}</div>'
+        f'{steps_html}'
+        f'{levels_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
 # ── KPI row ──────────────────────────────────────────────────────────────────
 
@@ -1357,98 +1368,99 @@ st.markdown(_CARD_END, unsafe_allow_html=True)
 #  1a. VANNA EXPOSURE (VEX) & CHARM EXPOSURE (CEX)
 # ══════════════════════════════════════════════════════════════════════════════
 
-col_v, col_c = st.columns(2)
+with st.expander("📊 VEX & CEX", expanded=not mode_fokus):
+    col_v, col_c = st.columns(2)
 
-with col_v:
-    st.markdown(
-        _card_start(
-            "Vanna Exposure (VEX)", "\U0001f300",
-            "Delta sensitivity to implied volatility changes",
-        )
-        + '<div style="font-size:0.75rem;color:#9ca3af;margin-bottom:8px;line-height:1.7;">'
-        + '<span style="color:#26a69a;">■</span> Hijau = magnet (harga tertarik ke strike itu)&emsp;'
-        + '<span style="color:#ef5350;">■</span> Merah = penolak (harga sulit lewat)<br>'
-        + '<span style="color:#6b7280;font-size:0.7rem;">Arah efeknya mengikuti sisi spot &amp; IV — VEX bekerja saat IV berubah; IV flat = efek vanna tidur</span>'
-        + '</div>',
-        unsafe_allow_html=True,
-    )
-    with st.expander("ℹ️ Detail"):
+    with col_v:
         st.markdown(
-            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:0.73rem;">'
-            + '<div style="color:#9ca3af;font-weight:600;">Kiri Spot</div>'
-            + '<div style="color:#9ca3af;font-weight:600;">Kanan Spot</div>'
-            + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Magnet turun</span></div>'
-            + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Magnet naik</span></div>'
-            + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Tolak (lantai)</span></div>'
-            + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Tolak (plafon)</span></div>'
+            _card_start(
+                "Vanna Exposure (VEX)", "\U0001f300",
+                "Delta sensitivity to implied volatility changes",
+            )
+            + '<div style="font-size:0.75rem;color:#9ca3af;margin-bottom:8px;line-height:1.7;">'
+            + '<span style="color:#26a69a;">■</span> Hijau = magnet (harga tertarik ke strike itu)&emsp;'
+            + '<span style="color:#ef5350;">■</span> Merah = penolak (harga sulit lewat)<br>'
+            + '<span style="color:#6b7280;font-size:0.7rem;">Arah efeknya mengikuti sisi spot &amp; IV — VEX bekerja saat IV berubah; IV flat = efek vanna tidur</span>'
             + '</div>',
             unsafe_allow_html=True,
         )
-    colors_vex = ["#26a69a" if v >= 0 else "#ef5350" for v in agg["vex"]]
-    customdata_vex = _build_customdata(agg["vex"].values, agg["strike"].values, spot, label_pos="MAGNET (Tertarik)", label_neg="TOLAK (Diusir)")
-    fig_vex = go.Figure(go.Bar(
-        x=agg["strike"], y=agg["vex"],
-        marker_color=colors_vex, opacity=0.9,
-        customdata=customdata_vex,
-        hovertemplate=_make_hover("VEX"),
-        showlegend=False,
-    ))
-    _spot_marker(fig_vex, spot, kpi.gamma_flip)
-    _vex_cap = np.percentile(np.abs(agg["vex"].values), 95) * 1.3 if len(agg) > 0 else 1
-    fig_vex.update_layout(xaxis_title="Strike Price", yaxis_title="Vanna Exposure ($)", yaxis_range=[-_vex_cap, _vex_cap], **_LAYOUT)
-    st.plotly_chart(fig_vex, key="vex")
-    if abs(kpi.total_vex) < 1e3:
-        _interp("Netral — perubahan volatilitas tidak trigger hedging signifikan")
-    elif kpi.total_vex > 0:
-        _interp(f"VEX positif ({_fmt_short(kpi.total_vex)}) — jika IV turun, dealer harus beli (bullish)")
-    else:
-        _interp(f"VEX negatif ({_fmt_short(kpi.total_vex)}) — jika IV naik, dealer harus jual (bearish)")
-    st.markdown(_CARD_END, unsafe_allow_html=True)
+        with st.expander("ℹ️ Detail"):
+            st.markdown(
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:0.73rem;">'
+                + '<div style="color:#9ca3af;font-weight:600;">Kiri Spot</div>'
+                + '<div style="color:#9ca3af;font-weight:600;">Kanan Spot</div>'
+                + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Magnet turun</span></div>'
+                + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Magnet naik</span></div>'
+                + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Tolak (lantai)</span></div>'
+                + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Tolak (plafon)</span></div>'
+                + '</div>',
+                unsafe_allow_html=True,
+            )
+        colors_vex = ["#26a69a" if v >= 0 else "#ef5350" for v in agg["vex"]]
+        customdata_vex = _build_customdata(agg["vex"].values, agg["strike"].values, spot, label_pos="MAGNET (Tertarik)", label_neg="TOLAK (Diusir)")
+        fig_vex = go.Figure(go.Bar(
+            x=agg["strike"], y=agg["vex"],
+            marker_color=colors_vex, opacity=0.9,
+            customdata=customdata_vex,
+            hovertemplate=_make_hover("VEX"),
+            showlegend=False,
+        ))
+        _spot_marker(fig_vex, spot, kpi.gamma_flip)
+        _vex_cap = np.percentile(np.abs(agg["vex"].values), 95) * 1.3 if len(agg) > 0 else 1
+        fig_vex.update_layout(xaxis_title="Strike Price", yaxis_title="Vanna Exposure ($)", yaxis_range=[-_vex_cap, _vex_cap], **_LAYOUT)
+        st.plotly_chart(fig_vex, key="vex")
+        if abs(kpi.total_vex) < 1e3:
+            _interp("Netral — perubahan volatilitas tidak trigger hedging signifikan")
+        elif kpi.total_vex > 0:
+            _interp(f"VEX positif ({_fmt_short(kpi.total_vex)}) — jika IV turun, dealer harus beli (bullish)")
+        else:
+            _interp(f"VEX negatif ({_fmt_short(kpi.total_vex)}) — jika IV naik, dealer harus jual (bearish)")
+        st.markdown(_CARD_END, unsafe_allow_html=True)
 
-with col_c:
-    st.markdown(
-        _card_start(
-            "Charm Exposure (CEX)", "⏳",
-            "Daily delta decay — time-driven hedging pressure",
-        )
-        + '<div style="font-size:0.75rem;color:#9ca3af;margin-bottom:8px;line-height:1.7;">'
-        + '<span style="color:#26a69a;">■</span> Hijau = tekanan beli harian dealer&emsp;'
-        + '<span style="color:#ef5350;">■</span> Merah = tekanan jual harian<br>'
-        + '<span style="color:#6b7280;font-size:0.7rem;">Efek menguat mendekati expiry — CEX bekerja tiap hari tanpa perlu pergerakan harga</span>'
-        + '</div>',
-        unsafe_allow_html=True,
-    )
-    with st.expander("ℹ️ Detail"):
+    with col_c:
         st.markdown(
-            '<div style="font-size:0.73rem;color:#9ca3af;line-height:1.8;">'
-            + '<span style="color:#26a69a;font-weight:600;">Positif (Hijau):</span> '
-            + 'Delta dealer naik seiring waktu → dealer beli underlying → bullish drift harian<br>'
-            + '<span style="color:#ef5350;font-weight:600;">Negatif (Merah):</span> '
-            + 'Delta dealer turun → dealer jual → bearish drift harian<br>'
-            + '<span style="color:#6b7280;">Besar CEX bergantung jarak ke expiry — OTM dekat expiry paling kuat</span>'
+            _card_start(
+                "Charm Exposure (CEX)", "⏳",
+                "Daily delta decay — time-driven hedging pressure",
+            )
+            + '<div style="font-size:0.75rem;color:#9ca3af;margin-bottom:8px;line-height:1.7;">'
+            + '<span style="color:#26a69a;">■</span> Hijau = tekanan beli harian dealer&emsp;'
+            + '<span style="color:#ef5350;">■</span> Merah = tekanan jual harian<br>'
+            + '<span style="color:#6b7280;font-size:0.7rem;">Efek menguat mendekati expiry — CEX bekerja tiap hari tanpa perlu pergerakan harga</span>'
             + '</div>',
             unsafe_allow_html=True,
         )
-    colors_cex = ["#26a69a" if v >= 0 else "#ef5350" for v in agg["cex"]]
-    customdata_cex = _build_customdata(agg["cex"].values, agg["strike"].values, spot)
-    fig_cex = go.Figure(go.Bar(
-        x=agg["strike"], y=agg["cex"],
-        marker_color=colors_cex, opacity=0.9,
-        customdata=customdata_cex,
-        hovertemplate=_make_hover("CEX"),
-        showlegend=False,
-    ))
-    _spot_marker(fig_cex, spot, kpi.gamma_flip)
-    _cex_cap = np.percentile(np.abs(agg["cex"].values), 95) * 1.3 if len(agg) > 0 else 1
-    fig_cex.update_layout(xaxis_title="Strike Price", yaxis_title="Charm Exposure ($)", yaxis_range=[-_cex_cap, _cex_cap], **_LAYOUT)
-    st.plotly_chart(fig_cex, key="cex")
-    if kpi.total_cex < -1e6:
-        _interp(f"Selling pressure harian kuat ({_fmt_short(kpi.total_cex)}) — bearish drift, hati-hati hold long")
-    elif kpi.total_cex > 1e6:
-        _interp(f"Buying pressure harian kuat ({_fmt_short(kpi.total_cex)}) — bullish drift")
-    else:
-        _interp("Charm netral — tidak ada tekanan harian yang signifikan")
-    st.markdown(_CARD_END, unsafe_allow_html=True)
+        with st.expander("ℹ️ Detail"):
+            st.markdown(
+                '<div style="font-size:0.73rem;color:#9ca3af;line-height:1.8;">'
+                + '<span style="color:#26a69a;font-weight:600;">Positif (Hijau):</span> '
+                + 'Delta dealer naik seiring waktu → dealer beli underlying → bullish drift harian<br>'
+                + '<span style="color:#ef5350;font-weight:600;">Negatif (Merah):</span> '
+                + 'Delta dealer turun → dealer jual → bearish drift harian<br>'
+                + '<span style="color:#6b7280;">Besar CEX bergantung jarak ke expiry — OTM dekat expiry paling kuat</span>'
+                + '</div>',
+                unsafe_allow_html=True,
+            )
+        colors_cex = ["#26a69a" if v >= 0 else "#ef5350" for v in agg["cex"]]
+        customdata_cex = _build_customdata(agg["cex"].values, agg["strike"].values, spot)
+        fig_cex = go.Figure(go.Bar(
+            x=agg["strike"], y=agg["cex"],
+            marker_color=colors_cex, opacity=0.9,
+            customdata=customdata_cex,
+            hovertemplate=_make_hover("CEX"),
+            showlegend=False,
+        ))
+        _spot_marker(fig_cex, spot, kpi.gamma_flip)
+        _cex_cap = np.percentile(np.abs(agg["cex"].values), 95) * 1.3 if len(agg) > 0 else 1
+        fig_cex.update_layout(xaxis_title="Strike Price", yaxis_title="Charm Exposure ($)", yaxis_range=[-_cex_cap, _cex_cap], **_LAYOUT)
+        st.plotly_chart(fig_cex, key="cex")
+        if kpi.total_cex < -1e6:
+            _interp(f"Selling pressure harian kuat ({_fmt_short(kpi.total_cex)}) — bearish drift, hati-hati hold long")
+        elif kpi.total_cex > 1e6:
+            _interp(f"Buying pressure harian kuat ({_fmt_short(kpi.total_cex)}) — bullish drift")
+        else:
+            _interp("Charm netral — tidak ada tekanan harian yang signifikan")
+        st.markdown(_CARD_END, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  1b. IMPLIED VOLATILITY (IV)
@@ -1591,155 +1603,155 @@ st.markdown(_CARD_END, unsafe_allow_html=True)
 #  2. ABSOLUTE GAMMA — OPEN INTEREST
 # ══════════════════════════════════════════════════════════════════════════════
 
-st.markdown(
-    _card_start(
-        "Absolute Gamma — Open Interest", "\U0001f4ca",
-        "Call vs Put open interest concentration per strike",
-        "Call OI (Upside)",
-        "Put OI (Downside)",
-    ),
-    unsafe_allow_html=True,
-)
-
-fig_abs = go.Figure()
-
-if has_conversion:
-    call_hover = (
-        f"<b>Strike $%{{x:,.0f}} ({ul_label} %{{customdata[0]}})</b><br>"
-        "Call OI: %{y:,.0f} contracts<br>"
-        "<extra></extra>"
+with st.expander("🔥 Heatmap & Absolute Gamma", expanded=not mode_fokus):
+    st.markdown(
+        _card_start(
+            "Absolute Gamma — Open Interest", "\U0001f4ca",
+            "Call vs Put open interest concentration per strike",
+            "Call OI (Upside)",
+            "Put OI (Downside)",
+        ),
+        unsafe_allow_html=True,
     )
-    put_hover = (
-        f"<b>Strike $%{{x:,.0f}} ({ul_label} %{{customdata[1]}})</b><br>"
-        "Put OI: %{customdata[0]:,.0f} contracts<br>"
-        "<extra></extra>"
-    )
-    ul_strike_str = [f"${s * conv_ratio:,.0f}" for s in agg["strike"]]
-    fig_abs.add_trace(go.Bar(
-        x=agg["strike"], y=agg["call_oi"], name="Call OI",
-        marker_color="#26a69a", opacity=0.9,
-        customdata=list(zip(ul_strike_str)),
-        hovertemplate=(
+
+    fig_abs = go.Figure()
+
+    if has_conversion:
+        call_hover = (
             f"<b>Strike $%{{x:,.0f}} ({ul_label} %{{customdata[0]}})</b><br>"
-            "Call OI: %{y:,.0f} contracts<br><extra></extra>"
+            "Call OI: %{y:,.0f} contracts<br>"
+            "<extra></extra>"
+        )
+        put_hover = (
+            f"<b>Strike $%{{x:,.0f}} ({ul_label} %{{customdata[1]}})</b><br>"
+            "Put OI: %{customdata[0]:,.0f} contracts<br>"
+            "<extra></extra>"
+        )
+        ul_strike_str = [f"${s * conv_ratio:,.0f}" for s in agg["strike"]]
+        fig_abs.add_trace(go.Bar(
+            x=agg["strike"], y=agg["call_oi"], name="Call OI",
+            marker_color="#26a69a", opacity=0.9,
+            customdata=list(zip(ul_strike_str)),
+            hovertemplate=(
+                f"<b>Strike $%{{x:,.0f}} ({ul_label} %{{customdata[0]}})</b><br>"
+                "Call OI: %{y:,.0f} contracts<br><extra></extra>"
+            ),
+        ))
+        fig_abs.add_trace(go.Bar(
+            x=agg["strike"], y=-agg["put_oi"], name="Put OI",
+            marker_color="#ef5350", opacity=0.9,
+            customdata=list(zip(agg["put_oi"], ul_strike_str)),
+            hovertemplate=(
+                f"<b>GLD $%{{x:,.0f}} ({ul_label} %{{customdata[1]}})</b><br>"
+                "Put OI: %{customdata[0]:,.0f} contracts<br><extra></extra>"
+            ),
+        ))
+    else:
+        fig_abs.add_trace(go.Bar(
+            x=agg["strike"], y=agg["call_oi"], name="Call OI",
+            marker_color="#26a69a", opacity=0.9,
+            hovertemplate=f"<b>Strike $%{{x:,.0f}} ({ticker})</b><br>Call OI: %{{y:,.0f}} contracts<br><extra></extra>",
+        ))
+        fig_abs.add_trace(go.Bar(
+            x=agg["strike"], y=-agg["put_oi"], name="Put OI",
+            marker_color="#ef5350", opacity=0.9,
+            customdata=agg["put_oi"],
+            hovertemplate=f"<b>Strike $%{{x:,.0f}} ({ticker})</b><br>Put OI: %{{customdata:,.0f}} contracts<br><extra></extra>",
+        ))
+
+    _spot_marker(fig_abs, spot, kpi.gamma_flip)
+    _oi_cap = np.percentile(np.concatenate([agg["call_oi"].values, agg["put_oi"].values]), 95) * 1.3 if len(agg) > 0 else 1
+    fig_abs.update_layout(
+        barmode="relative", xaxis_title="Strike Price",
+        yaxis_title="Open Interest (Contracts)", yaxis_range=[-_oi_cap, _oi_cap], **_LAYOUT,
+    )
+    st.plotly_chart(fig_abs, key="abs_gex")
+    total_call = agg["call_oi"].sum()
+    total_put = agg["put_oi"].sum()
+    pcr = total_put / total_call if total_call > 0 else 0
+    if pcr > 1.2:
+        _interp(f"Put-heavy (P/C ratio {pcr:.2f}) — protective positioning dominan, pasar defensif")
+    elif pcr < 0.8:
+        _interp(f"Call-heavy (P/C ratio {pcr:.2f}) — bullish positioning dominan")
+    else:
+        _interp(f"Seimbang (P/C ratio {pcr:.2f}) — tidak ada bias kuat dari open interest")
+    st.markdown(_CARD_END, unsafe_allow_html=True)
+
+    # ══ HEDGING PRESSURE HEATMAP (normalized -1 to +1) ══════════════════════
+
+    st.markdown(
+        _card_start(
+            "Dealer Hedging Pressure Heatmap", "\U0001f525",
+            "Normalized hedge pressure per strike (-1 = max support, +1 = max resistance)",
+            "Positif — Resistance (MM Sell)",
+            "Negatif — Support (MM Buy)",
         ),
+        unsafe_allow_html=True,
+    )
+
+    gex_vals = agg["gex"].values
+    max_abs_gex = np.max(np.abs(gex_vals)) if len(gex_vals) > 0 else 1.0
+    norm_gex = gex_vals / (max_abs_gex if max_abs_gex > 0 else 1.0)
+
+    colors_heatmap = ["#26a69a" if v >= 0 else "#ef5350" for v in norm_gex]
+    customdata_hm = _build_customdata(gex_vals, agg["strike"].values, spot)
+
+    fig_hm = go.Figure()
+    fig_hm.add_trace(go.Bar(
+        x=agg["strike"], y=norm_gex,
+        marker_color=colors_heatmap, opacity=0.9,
+        customdata=customdata_hm,
+        hovertemplate=_make_hover("Score"),
+        showlegend=False,
     ))
-    fig_abs.add_trace(go.Bar(
-        x=agg["strike"], y=-agg["put_oi"], name="Put OI",
-        marker_color="#ef5350", opacity=0.9,
-        customdata=list(zip(agg["put_oi"], ul_strike_str)),
-        hovertemplate=(
-            f"<b>GLD $%{{x:,.0f}} ({ul_label} %{{customdata[1]}})</b><br>"
-            "Put OI: %{customdata[0]:,.0f} contracts<br><extra></extra>"
-        ),
-    ))
-else:
-    fig_abs.add_trace(go.Bar(
-        x=agg["strike"], y=agg["call_oi"], name="Call OI",
-        marker_color="#26a69a", opacity=0.9,
-        hovertemplate=f"<b>Strike $%{{x:,.0f}} ({ticker})</b><br>Call OI: %{{y:,.0f}} contracts<br><extra></extra>",
-    ))
-    fig_abs.add_trace(go.Bar(
-        x=agg["strike"], y=-agg["put_oi"], name="Put OI",
-        marker_color="#ef5350", opacity=0.9,
-        customdata=agg["put_oi"],
-        hovertemplate=f"<b>Strike $%{{x:,.0f}} ({ticker})</b><br>Put OI: %{{customdata:,.0f}} contracts<br><extra></extra>",
-    ))
-
-_spot_marker(fig_abs, spot, kpi.gamma_flip)
-_oi_cap = np.percentile(np.concatenate([agg["call_oi"].values, agg["put_oi"].values]), 95) * 1.3 if len(agg) > 0 else 1
-fig_abs.update_layout(
-    barmode="relative", xaxis_title="Strike Price",
-    yaxis_title="Open Interest (Contracts)", yaxis_range=[-_oi_cap, _oi_cap], **_LAYOUT,
-)
-st.plotly_chart(fig_abs, key="abs_gex")
-total_call = agg["call_oi"].sum()
-total_put = agg["put_oi"].sum()
-pcr = total_put / total_call if total_call > 0 else 0
-if pcr > 1.2:
-    _interp(f"Put-heavy (P/C ratio {pcr:.2f}) — protective positioning dominan, pasar defensif")
-elif pcr < 0.8:
-    _interp(f"Call-heavy (P/C ratio {pcr:.2f}) — bullish positioning dominan")
-else:
-    _interp(f"Seimbang (P/C ratio {pcr:.2f}) — tidak ada bias kuat dari open interest")
-st.markdown(_CARD_END, unsafe_allow_html=True)
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  1b. HEDGING PRESSURE HEATMAP (normalized -1 to +1)
-# ══════════════════════════════════════════════════════════════════════════════
-
-st.markdown(
-    _card_start(
-        "Dealer Hedging Pressure Heatmap", "\U0001f525",
-        "Normalized hedge pressure per strike (-1 = max support, +1 = max resistance)",
-        "Positif — Resistance (MM Sell)",
-        "Negatif — Support (MM Buy)",
-    ),
-    unsafe_allow_html=True,
-)
-
-gex_vals = agg["gex"].values
-max_abs_gex = np.max(np.abs(gex_vals)) if len(gex_vals) > 0 else 1.0
-norm_gex = gex_vals / (max_abs_gex if max_abs_gex > 0 else 1.0)
-
-colors_heatmap = ["#26a69a" if v >= 0 else "#ef5350" for v in norm_gex]
-customdata_hm = _build_customdata(gex_vals, agg["strike"].values, spot)
-
-fig_hm = go.Figure()
-fig_hm.add_trace(go.Bar(
-    x=agg["strike"], y=norm_gex,
-    marker_color=colors_heatmap, opacity=0.9,
-    customdata=customdata_hm,
-    hovertemplate=_make_hover("Score"),
-    showlegend=False,
-))
-_spot_marker(fig_hm, spot, kpi.gamma_flip)
-fig_hm.update_layout(
-    xaxis_title="Strike Price", yaxis_title="Hedge Pressure Score",
-    yaxis_range=[-1.1, 1.1], **_LAYOUT,
-)
-st.plotly_chart(fig_hm, key="heatmap")
-max_strike = agg.loc[agg["gex"].idxmax(), "strike"] if len(agg) > 0 else 0
-_interp(f"Tekanan terkuat di strike ${max_strike:,.0f}" + (f" ({ul_label} ${max_strike * conv_ratio:,.0f})" if has_conversion else "") + " — perhatikan level ini")
-st.markdown(_CARD_END, unsafe_allow_html=True)
+    _spot_marker(fig_hm, spot, kpi.gamma_flip)
+    fig_hm.update_layout(
+        xaxis_title="Strike Price", yaxis_title="Hedge Pressure Score",
+        yaxis_range=[-1.1, 1.1], **_LAYOUT,
+    )
+    st.plotly_chart(fig_hm, key="heatmap")
+    max_strike = agg.loc[agg["gex"].idxmax(), "strike"] if len(agg) > 0 else 0
+    _interp(f"Tekanan terkuat di strike ${max_strike:,.0f}" + (f" ({ul_label} ${max_strike * conv_ratio:,.0f})" if has_conversion else "") + " — perhatikan level ini")
+    st.markdown(_CARD_END, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  5. NET DELTA EXPOSURE
 # ══════════════════════════════════════════════════════════════════════════════
 
-st.markdown(
-    _card_start(
-        "Net Delta Exposure", "\U0001f3af",
-        "Dealer directional exposure per strike",
-        "Positif — Long Delta",
-        "Negatif — Short Delta",
-    ),
-    unsafe_allow_html=True,
-)
+with st.expander("📈 Net Delta & OI", expanded=not mode_fokus):
+    st.markdown(
+        _card_start(
+            "Net Delta Exposure", "\U0001f3af",
+            "Dealer directional exposure per strike",
+            "Positif — Long Delta",
+            "Negatif — Short Delta",
+        ),
+        unsafe_allow_html=True,
+    )
 
-colors_delta = ["#26a69a" if v >= 0 else "#ef5350" for v in agg["delta_exposure"]]
-customdata_delta = _build_customdata(agg["delta_exposure"].values, agg["strike"].values, spot)
+    colors_delta = ["#26a69a" if v >= 0 else "#ef5350" for v in agg["delta_exposure"]]
+    customdata_delta = _build_customdata(agg["delta_exposure"].values, agg["strike"].values, spot)
 
-fig_delta = go.Figure(go.Bar(
-    x=agg["strike"], y=agg["delta_exposure"],
-    marker_color=colors_delta, opacity=0.9,
-    customdata=customdata_delta,
-    hovertemplate=_make_hover("Delta"),
-    showlegend=False,
-))
-_spot_marker(fig_delta, spot, kpi.gamma_flip)
-_delta_cap = np.percentile(np.abs(agg["delta_exposure"].values), 95) * 1.3 if len(agg) > 0 else 1
-fig_delta.update_layout(xaxis_title="Strike Price", yaxis_title="Delta Exposure ($)", yaxis_range=[-_delta_cap, _delta_cap], **_LAYOUT)
-st.plotly_chart(fig_delta, key="delta")
-if kpi.net_delta > 0:
-    _interp(f"Dealer long delta ({_fmt_short(kpi.net_delta)}) — bullish hedge positioning, ada support dari dealer")
-else:
-    _interp(f"Dealer short delta ({_fmt_short(kpi.net_delta)}) — bearish positioning, dealer ikut tekan harga turun")
-st.markdown(_CARD_END, unsafe_allow_html=True)
+    fig_delta = go.Figure(go.Bar(
+        x=agg["strike"], y=agg["delta_exposure"],
+        marker_color=colors_delta, opacity=0.9,
+        customdata=customdata_delta,
+        hovertemplate=_make_hover("Delta"),
+        showlegend=False,
+    ))
+    _spot_marker(fig_delta, spot, kpi.gamma_flip)
+    _delta_cap = np.percentile(np.abs(agg["delta_exposure"].values), 95) * 1.3 if len(agg) > 0 else 1
+    fig_delta.update_layout(xaxis_title="Strike Price", yaxis_title="Delta Exposure ($)", yaxis_range=[-_delta_cap, _delta_cap], **_LAYOUT)
+    st.plotly_chart(fig_delta, key="delta")
+    if kpi.net_delta > 0:
+        _interp(f"Dealer long delta ({_fmt_short(kpi.net_delta)}) — bullish hedge positioning, ada support dari dealer")
+    else:
+        _interp(f"Dealer short delta ({_fmt_short(kpi.net_delta)}) — bearish positioning, dealer ikut tekan harga turun")
+    st.markdown(_CARD_END, unsafe_allow_html=True)
 
 # ── Raw data ─────────────────────────────────────────────────────────────────
 
-with st.expander("Raw Aggregated Data"):
+with st.expander("📓 Jurnal — Data Mentah"):
     st.dataframe(
         agg.style.format({
             "strike": "{:.1f}",
