@@ -54,8 +54,8 @@ footer {visibility: hidden;}
     top: 50% !important; left: 50% !important;
     transform: translate(-50%, -50%) !important;
     z-index: 9999 !important;
-    background: rgba(10,10,15,0.92) !important;
-    border: 1px solid #1a1a2e !important;
+    background: rgba(14,17,23,0.95) !important;
+    border: 1px solid #232936 !important;
     border-radius: 14px !important;
     padding: 28px 40px !important;
     box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
@@ -65,18 +65,18 @@ footer {visibility: hidden;}
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-.stApp { background-color: #0a0a0f; }
+.stApp { background-color: #0e1117; }
 .block-container { padding-top: 1rem; padding-bottom: 1rem; }
 
 .card {
-    background: linear-gradient(145deg, #111118 0%, #0d0d14 100%);
-    border: 1px solid #1a1a2e;
-    border-radius: 14px;
-    padding: 24px 28px 18px 28px;
-    margin-bottom: 18px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    background: #161b26;
+    border: 1px solid #232936;
+    border-radius: 12px;
+    padding: 22px 26px 16px 26px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.35);
 }
-.card-title { font-size: 1.15rem; font-weight: 700; color: #e2e8f0; margin-bottom: 2px; }
+.card-title { font-size: 1.05rem; font-weight: 700; color: #e6e9ef; margin-bottom: 2px; letter-spacing: -0.01em; }
 .card-subtitle { font-size: 0.78rem; color: #6b7280; margin-bottom: 14px; }
 .card-legend { display: flex; gap: 28px; margin-bottom: 10px; font-size: 0.8rem; color: #9ca3af; }
 .legend-green::before {
@@ -88,14 +88,14 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     background: #ef5350; border-radius: 3px; margin-right: 6px; vertical-align: middle;
 }
 
-.kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 18px; }
+.kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 20px; }
 .kpi-box {
-    background: linear-gradient(145deg, #111118 0%, #0d0d14 100%);
-    border: 1px solid #1a1a2e; border-radius: 12px;
-    padding: 16px 18px; box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    background: #161b26;
+    border: 1px solid #232936; border-radius: 10px;
+    padding: 14px 16px; box-shadow: none;
 }
-.kpi-label { font-size: 0.65rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
-.kpi-value { font-size: 1.2rem; font-weight: 700; color: #e2e8f0; }
+.kpi-label { font-size: 0.65rem; color: #9aa4b2; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+.kpi-value { font-size: 1.2rem; font-weight: 700; color: #e6e9ef; font-variant-numeric: tabular-nums; }
 .kpi-value.positive { color: #26a69a; }
 .kpi-value.negative { color: #ef5350; }
 .kpi-value.neutral  { color: #fbbf24; }
@@ -103,10 +103,10 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 .dash-header { font-size: 1.5rem; font-weight: 700; color: #e2e8f0; margin-bottom: 2px; }
 .dash-sub { font-size: 0.85rem; color: #6b7280; margin-bottom: 16px; }
 
-section[data-testid="stSidebar"] { background-color: #0d0d14; border-right: 1px solid #1a1a2e; }
+section[data-testid="stSidebar"] { background-color: #111827; border-right: 1px solid #232936; }
 div[data-testid="stMetric"] {
-    background: linear-gradient(135deg, #111118 0%, #0d0d14 100%);
-    border: 1px solid #1a1a2e; border-radius: 10px; padding: 12px 16px;
+    background: #161b26;
+    border: 1px solid #232936; border-radius: 10px; padding: 12px 16px;
 }
 div[data-testid="stMetric"] label { color: #6b7280; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
 div[data-testid="stMetric"] div[data-testid="stMetricValue"] { color: #fbbf24; font-size: 1.25rem; font-weight: 700; }
@@ -140,9 +140,9 @@ div[data-testid="stMetric"] div[data-testid="stMetricValue"] { color: #fbbf24; f
 /* Key levels */
 .levels-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 18px; }
 .level-box {
-    background: linear-gradient(145deg, #111118 0%, #0d0d14 100%);
-    border: 1px solid #1a1a2e; border-radius: 12px;
-    padding: 16px 18px;
+    background: #161b26;
+    border: 1px solid #232936; border-radius: 10px;
+    padding: 14px 16px;
 }
 .level-title { font-size: 0.7rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
 .level-item { font-size: 0.9rem; font-weight: 600; margin-bottom: 4px; }
@@ -153,8 +153,8 @@ div[data-testid="stMetric"] div[data-testid="stMetricValue"] { color: #fbbf24; f
 
 /* Signal filter */
 .signal-box {
-    background: linear-gradient(145deg, #111118 0%, #0d0d14 100%);
-    border: 1px solid #1a1a2e; border-radius: 12px;
+    background: #161b26;
+    border: 1px solid #232936; border-radius: 10px;
     padding: 18px 24px; margin-bottom: 18px;
 }
 .signal-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
@@ -172,8 +172,8 @@ div[data-testid="stMetric"] div[data-testid="stMetricValue"] { color: #fbbf24; f
 
 /* Trading guide */
 .guide-box {
-    background: linear-gradient(145deg, #111118 0%, #0d0d14 100%);
-    border-radius: 12px; padding: 18px 24px; margin-bottom: 18px;
+    background: #161b26;
+    border-radius: 10px; padding: 18px 24px; margin-bottom: 18px;
 }
 .guide-box.buy-guide { border: 1px solid rgba(38,166,154,0.4); }
 .guide-box.sell-guide { border: 1px solid rgba(239,83,80,0.4); }
@@ -191,10 +191,10 @@ div[data-testid="stMetric"] div[data-testid="stMetricValue"] { color: #fbbf24; f
 /* Interpretation text */
 .interpretation {
     font-size: 0.8rem;
-    color: #9ca3af;
+    color: #9aa4b2;
     font-style: italic;
     padding: 8px 0 4px 0;
-    border-top: 1px solid #1a1a2e;
+    border-top: 1px solid #232936;
     margin-top: 8px;
 }
 
@@ -330,7 +330,7 @@ with ctrl_3:
     st.markdown(
         f'<div style="margin-top:24px;">'
         f'<span style="font-size:0.7rem;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em;">Spot Price</span><br>'
-        f'<span style="font-size:1.25rem;font-weight:700;color:#fbbf24;">{spot_text}</span>'
+        f'<span style="font-size:1.25rem;font-weight:700;color:#fbbf24;font-variant-numeric:tabular-nums;">{spot_text}</span>'
         f'</div>',
         unsafe_allow_html=True,
     )
@@ -595,6 +595,16 @@ _hole_xau_k = _kprice(float(_hole_df_k["strike"].iloc[0])) if len(_hole_df_k) > 
 _flip_xau_k = _kprice(kpi.gamma_flip) if kpi.gamma_flip else None
 _spot_ref_k  = _kprice(spot)
 
+# Gap spot→flip for Layer 1 display (appended after kprice helpers are ready)
+if kpi.gamma_flip is not None and _flip_xau_k is not None:
+    _gap_pct = abs(spot - kpi.gamma_flip) / spot * 100
+    _gap_abs = abs(_spot_ref_k - _flip_xau_k)
+    _gap_clr = "#26a69a" if _gap_pct > 1.0 else "#fbbf24" if _gap_pct >= 0.5 else "#ef5350"
+    _l1_desc += (
+        f' <span style="font-size:0.72rem;color:{_gap_clr};font-weight:600;">'
+        f'(Gap ${_gap_abs:,.0f} · {_gap_pct:.1f}%)</span>'
+    )
+
 def _kfmt(v):
     return f"${v:,.0f}" if v is not None else "N/A"
 
@@ -848,16 +858,16 @@ _l5_desc  = "SL di luar level GEX terdekat  ·  Maks 1–2% modal  ·  Jangan av
 _setup_ok_k = _l1_ok and _l2_ok and _l3_ok
 if _setup_ok_k:
     _banner_k = (
-        '<div style="background:rgba(38,166,154,0.15);border:2px solid #26a69a;border-radius:10px;'
+        '<div style="background:rgba(38,166,154,0.07);border:1px solid #26a69a;border-radius:10px;'
         'padding:11px 18px;margin-bottom:14px;text-align:center;">'
         '<span style="font-size:0.95rem;font-weight:700;color:#26a69a;letter-spacing:0.04em;">'
         '✅ SETUP LENGKAP — Lanjut ke konfirmasi entry</span></div>'
     )
 else:
     _banner_k = (
-        '<div style="background:rgba(75,85,99,0.25);border:2px solid #4b5563;border-radius:10px;'
+        '<div style="background:rgba(239,83,80,0.06);border:1px solid #ef5350;border-radius:10px;'
         'padding:11px 18px;margin-bottom:14px;text-align:center;">'
-        '<span style="font-size:0.95rem;font-weight:700;color:#9ca3af;letter-spacing:0.04em;">'
+        '<span style="font-size:0.95rem;font-weight:700;color:#ef5350;letter-spacing:0.04em;">'
         '⛔ SETUP BELUM LENGKAP — JANGAN ENTRY</span></div>'
     )
 
@@ -1155,15 +1165,15 @@ _LAYOUT = dict(
     template="plotly_dark",
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Inter, sans-serif", size=12, color="#9ca3af"),
-    margin=dict(l=55, r=20, t=10, b=50),
+    font=dict(family="Inter, sans-serif", size=11, color="#9aa4b2"),
+    margin=dict(l=48, r=12, t=8, b=44),
     legend=dict(
         orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
-        font=dict(size=11, color="#9ca3af"), bgcolor="rgba(0,0,0,0)",
+        font=dict(size=10, color="#9aa4b2"), bgcolor="rgba(0,0,0,0)",
     ),
     height=400,
-    xaxis=dict(gridcolor="#1a1a2e", zeroline=False),
-    yaxis=dict(gridcolor="#1a1a2e", zeroline=True, zerolinecolor="#2a2a3e"),
+    xaxis=dict(showgrid=False, zeroline=False),
+    yaxis=dict(gridcolor="#1c2230", zeroline=True, zerolinecolor="#2a3040"),
 )
 
 
@@ -1172,9 +1182,9 @@ def _spot_marker(fig, spot, gamma_flip):
     if has_conversion:
         spot_label += f" ({ul_label} ${spot * conv_ratio:,.0f})"
     fig.add_vline(
-        x=spot, line_dash="dash", line_color="rgba(251,191,36,0.5)", line_width=1.5,
+        x=spot, line_dash="dash", line_color="rgba(251,191,36,0.65)", line_width=1,
         annotation_text=f"Spot {spot_label}",
-        annotation_font=dict(color="rgba(251,191,36,0.7)", size=10, family="Inter"),
+        annotation_font=dict(color="rgba(251,191,36,0.8)", size=10, family="Inter"),
         annotation_bgcolor="rgba(0,0,0,0)",
         annotation_borderwidth=0, annotation_borderpad=3,
         annotation_position="bottom right",
@@ -1186,11 +1196,11 @@ def _spot_marker(fig, spot, gamma_flip):
             flip_label += f" ({ul_label} ${gamma_flip * conv_ratio:,.0f})"
         gap_ul = abs(spot - gamma_flip) * conv_ratio
         fig.add_vline(
-            x=gamma_flip, line_dash="dot", line_color="#00e5a0", line_width=1.5,
+            x=gamma_flip, line_dash="dot", line_color="rgba(38,166,154,0.8)", line_width=1,
             annotation_text=f"FLIP {flip_label} | Gap ${gap_ul:,.0f}",
-            annotation_font=dict(color="#00e5a0", size=11, family="Inter"),
-            annotation_bgcolor="rgba(0,229,160,0.12)",
-            annotation_bordercolor="rgba(0,229,160,0.4)",
+            annotation_font=dict(color="rgba(38,166,154,0.9)", size=10, family="Inter"),
+            annotation_bgcolor="rgba(38,166,154,0.1)",
+            annotation_bordercolor="rgba(38,166,154,0.35)",
             annotation_borderwidth=1, annotation_borderpad=5,
             annotation_position="top left",
         )
@@ -1232,7 +1242,7 @@ def _card_start(title, emoji, subtitle, legend_green=None, legend_red=None, hint
     return (
         f'<div class="card">'
         f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
-        f'<div><div class="card-title">{emoji} {title}</div>'
+        f'<div><div class="card-title">{title}</div>'
         f'<div class="card-subtitle">{subtitle}</div></div>'
         f'<div style="font-size:0.75rem;color:#4b5563;">{hint}</div></div>'
         + _leg
@@ -1323,14 +1333,14 @@ with st.expander("ℹ️ Lihat semua kombinasi"):
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:0.73rem;">'
         + '<div style="color:#26a69a;font-weight:700;">LONG GAMMA</div>'
         + '<div style="color:#ef5350;font-weight:700;">SHORT GAMMA</div>'
-        + '<div style="color:#9ca3af;font-weight:600;">Kiri Flip</div>'
-        + '<div style="color:#9ca3af;font-weight:600;">Kiri Flip</div>'
+        + '<div style="color:#9ca3af;font-weight:600;">Di bawah SPOT</div>'
+        + '<div style="color:#9ca3af;font-weight:600;">Di bawah SPOT</div>'
         + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Resistance</span></div>'
         + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Lantai (nahan jatuh)</span></div>'
         + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Support</span></div>'
         + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Lubang (jatuh cepat)</span></div>'
-        + '<div style="color:#9ca3af;font-weight:600;margin-top:4px;">Kanan Flip</div>'
-        + '<div style="color:#9ca3af;font-weight:600;margin-top:4px;">Kanan Flip</div>'
+        + '<div style="color:#9ca3af;font-weight:600;margin-top:4px;">Di atas SPOT</div>'
+        + '<div style="color:#9ca3af;font-weight:600;margin-top:4px;">Di atas SPOT</div>'
         + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Resistance</span></div>'
         + '<div><span style="color:#26a69a;">■</span> <span style="color:#9ca3af;">Hijau = Tembok (nahan naik)</span></div>'
         + '<div><span style="color:#ef5350;">■</span> <span style="color:#9ca3af;">Merah = Support</span></div>'
@@ -1353,7 +1363,7 @@ fig_gex.add_trace(go.Bar(
 _spot_marker(fig_gex, spot, kpi.gamma_flip)
 _gex_cap = np.percentile(np.abs(agg["gex"].values), 95) * 1.3 if len(agg) > 0 else 1
 fig_gex.update_layout(xaxis_title="Strike Price", yaxis_title="Gamma Exposure ($)", yaxis_range=[-_gex_cap, _gex_cap], **_LAYOUT)
-st.plotly_chart(fig_gex, key="gex")
+st.plotly_chart(fig_gex, key="gex", config={"displayModeBar": False})
 _pos_count = (agg["gex"] > 0).sum()
 _neg_count = (agg["gex"] < 0).sum()
 if _neg_count > _pos_count:
@@ -1408,7 +1418,7 @@ with st.expander("📊 VEX & CEX", expanded=not mode_fokus):
         _spot_marker(fig_vex, spot, kpi.gamma_flip)
         _vex_cap = np.percentile(np.abs(agg["vex"].values), 95) * 1.3 if len(agg) > 0 else 1
         fig_vex.update_layout(xaxis_title="Strike Price", yaxis_title="Vanna Exposure ($)", yaxis_range=[-_vex_cap, _vex_cap], **_LAYOUT)
-        st.plotly_chart(fig_vex, key="vex")
+        st.plotly_chart(fig_vex, key="vex", config={"displayModeBar": False})
         if abs(kpi.total_vex) < 1e3:
             _interp("Netral — perubahan volatilitas tidak trigger hedging signifikan")
         elif kpi.total_vex > 0:
@@ -1453,7 +1463,7 @@ with st.expander("📊 VEX & CEX", expanded=not mode_fokus):
         _spot_marker(fig_cex, spot, kpi.gamma_flip)
         _cex_cap = np.percentile(np.abs(agg["cex"].values), 95) * 1.3 if len(agg) > 0 else 1
         fig_cex.update_layout(xaxis_title="Strike Price", yaxis_title="Charm Exposure ($)", yaxis_range=[-_cex_cap, _cex_cap], **_LAYOUT)
-        st.plotly_chart(fig_cex, key="cex")
+        st.plotly_chart(fig_cex, key="cex", config={"displayModeBar": False})
         if kpi.total_cex < -1e6:
             _interp(f"Selling pressure harian kuat ({_fmt_short(kpi.total_cex)}) — bearish drift, hati-hati hold long")
         elif kpi.total_cex > 1e6:
@@ -1506,7 +1516,7 @@ if atm_iv is not None:
     st.markdown(
         f'<div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;">'
         f'<div><div style="font-size:0.65rem;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;">ATM IV — Strike {_atm_lbl}</div>'
-        f'<div style="font-size:2rem;font-weight:700;color:#fbbf24;line-height:1.2;">{atm_iv:.1f}%</div></div>'
+        f'<div style="font-size:2rem;font-weight:700;color:#fbbf24;line-height:1.2;font-variant-numeric:tabular-nums;">{atm_iv:.1f}%</div></div>'
         f'<div style="background:{_iv_badge_color};color:#fff;border-radius:8px;padding:6px 14px;font-size:0.9rem;font-weight:700;">'
         f'{_iv_badge_txt}</div>'
         f'</div>',
@@ -1530,7 +1540,7 @@ with col_iv1:
             xaxis_title="Waktu (WIB)", yaxis_title="ATM IV (%)",
             showlegend=False, **_LAYOUT,
         )
-        st.plotly_chart(fig_iv_line, key="iv_line")
+        st.plotly_chart(fig_iv_line, key="iv_line", config={"displayModeBar": False})
     else:
         st.markdown(
             '<div style="color:#6b7280;font-size:0.85rem;padding:30px 0;text-align:center;">'
@@ -1572,7 +1582,7 @@ with col_iv2:
             yaxis_range=[max(0, _skew_med * 0.7), _skew_med * 1.5],
             showlegend=False, **_LAYOUT,
         )
-        st.plotly_chart(fig_skew, key="iv_skew")
+        st.plotly_chart(fig_skew, key="iv_skew", config={"displayModeBar": False})
         if _skew_excluded > 0:
             st.markdown(
                 f'<div style="font-size:0.72rem;color:#4b5563;margin-top:-8px;">'
@@ -1665,7 +1675,7 @@ with st.expander("🔥 Heatmap & Absolute Gamma", expanded=not mode_fokus):
         barmode="relative", xaxis_title="Strike Price",
         yaxis_title="Open Interest (Contracts)", yaxis_range=[-_oi_cap, _oi_cap], **_LAYOUT,
     )
-    st.plotly_chart(fig_abs, key="abs_gex")
+    st.plotly_chart(fig_abs, key="abs_gex", config={"displayModeBar": False})
     total_call = agg["call_oi"].sum()
     total_put = agg["put_oi"].sum()
     pcr = total_put / total_call if total_call > 0 else 0
@@ -1709,7 +1719,7 @@ with st.expander("🔥 Heatmap & Absolute Gamma", expanded=not mode_fokus):
         xaxis_title="Strike Price", yaxis_title="Hedge Pressure Score",
         yaxis_range=[-1.1, 1.1], **_LAYOUT,
     )
-    st.plotly_chart(fig_hm, key="heatmap")
+    st.plotly_chart(fig_hm, key="heatmap", config={"displayModeBar": False})
     max_strike = agg.loc[agg["gex"].idxmax(), "strike"] if len(agg) > 0 else 0
     _interp(f"Tekanan terkuat di strike ${max_strike:,.0f}" + (f" ({ul_label} ${max_strike * conv_ratio:,.0f})" if has_conversion else "") + " — perhatikan level ini")
     st.markdown(_CARD_END, unsafe_allow_html=True)
@@ -1742,7 +1752,7 @@ with st.expander("📈 Net Delta & OI", expanded=not mode_fokus):
     _spot_marker(fig_delta, spot, kpi.gamma_flip)
     _delta_cap = np.percentile(np.abs(agg["delta_exposure"].values), 95) * 1.3 if len(agg) > 0 else 1
     fig_delta.update_layout(xaxis_title="Strike Price", yaxis_title="Delta Exposure ($)", yaxis_range=[-_delta_cap, _delta_cap], **_LAYOUT)
-    st.plotly_chart(fig_delta, key="delta")
+    st.plotly_chart(fig_delta, key="delta", config={"displayModeBar": False})
     if kpi.net_delta > 0:
         _interp(f"Dealer long delta ({_fmt_short(kpi.net_delta)}) — bullish hedge positioning, ada support dari dealer")
     else:
