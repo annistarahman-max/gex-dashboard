@@ -8,6 +8,7 @@ import contextlib
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 import numpy as np
 import streamlit as st
 import pandas as pd
@@ -15,6 +16,24 @@ import plotly.graph_objects as go
 import yfinance as yf
 
 WIB = timezone(timedelta(hours=7))
+_ET = ZoneInfo("America/New_York")
+
+# NYSE calendar 2026 — full holidays and early-close days (13:00 ET)
+_US_HOLIDAYS_2026 = {
+    "2026-01-01",  # New Year's Day
+    "2026-01-19",  # MLK Day
+    "2026-02-16",  # Presidents Day
+    "2026-04-03",  # Good Friday
+    "2026-05-25",  # Memorial Day
+    "2026-09-07",  # Labor Day
+    "2026-11-26",  # Thanksgiving
+    "2026-12-25",  # Christmas
+}
+_US_EARLY_CLOSE_2026 = {
+    "2026-07-03": "13:00",  # Jul 4 falls Sat → Fri early close
+    "2026-11-27": "13:00",  # Day after Thanksgiving
+    "2026-12-24": "13:00",  # Christmas Eve
+}
 
 from src.data.data_provider import get_provider
 from src.engine.exposure import aggregate_by_strike, compute_exposures, summarize
@@ -282,7 +301,7 @@ def _cached_candles_1m(tkr: str) -> "pd.DataFrame":
         return pd.DataFrame()
 
 
-ctrl_1, ctrl_2, ctrl_3, ctrl_4 = st.columns([1, 1, 1, 1])
+ctrl_1, ctrl_2, ctrl_3, ctrl_4, ctrl_5, ctrl_6 = st.columns([0.75, 1.1, 1.5, 0.75, 1.0, 0.65])
 
 with ctrl_1:
     ticker = st.text_input(
@@ -336,20 +355,20 @@ with ctrl_3:
     )
 
 with ctrl_4:
-    rc1, rc2, rc3 = st.columns(3)
-    with rc1:
-        auto_interval = st.selectbox("Auto Refresh", list(REFRESH_INTERVALS.keys()), index=2)
-    with rc2:
-        oanda_price = st.number_input(
-            "Harga Forex (XAUUSD)",
-            min_value=0.0, value=0.0, step=0.1, format="%.2f",
-            help="Isi harga XAUUSD dari broker kamu (Exness, IC Markets, dll)"
-        )
-    with rc3:
-        st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
-        if st.button("Refresh Now", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
+    auto_interval = st.selectbox("Auto Refresh", list(REFRESH_INTERVALS.keys()), index=2)
+
+with ctrl_5:
+    oanda_price = st.number_input(
+        "Forex (XAUUSD)",
+        min_value=0.0, value=0.0, step=0.1, format="%.2f",
+        help="Isi harga XAUUSD dari broker kamu (Exness, IC Markets, dll)"
+    )
+
+with ctrl_6:
+    st.markdown("<div style='margin-top:28px;'></div>", unsafe_allow_html=True)
+    if st.button("Refresh Now", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
 interval_sec = REFRESH_INTERVALS[auto_interval]
 if interval_sec > 0:
@@ -465,10 +484,26 @@ else:
     _iv_today = pd.DataFrame(columns=["timestamp", "atm_iv", "date"])
 
 _should_append_iv = True
+
+# Holiday guard — block IV recording on weekends / US market holidays
+_now_et = datetime.now(_ET)
+_today_et_str = _now_et.strftime("%Y-%m-%d")
+_iv_holiday_block = (
+    _now_et.weekday() >= 5  # Saturday (5) or Sunday (6)
+    or _today_et_str in _US_HOLIDAYS_2026
+    or (
+        _today_et_str in _US_EARLY_CLOSE_2026
+        and _now_et.strftime("%H:%M") >= _US_EARLY_CLOSE_2026[_today_et_str]
+    )
+)
+if _iv_holiday_block:
+    _should_append_iv = False
+
 if len(_iv_today) > 0 and atm_iv_raw is not None:
     _last_iv_ts = pd.to_datetime(_iv_today["timestamp"].iloc[-1])
     _elapsed_iv = (datetime.now(WIB).replace(tzinfo=None) - _last_iv_ts.replace(tzinfo=None)).total_seconds() / 60
-    _should_append_iv = _elapsed_iv >= 1.0
+    if not _iv_holiday_block:
+        _should_append_iv = _elapsed_iv >= 1.0
 
 # Reject outlier: if ≥5 prior readings exist and new value deviates >5pt from their median.
 # Exception: if 3 consecutive rejections all cluster within 2pt of each other, treat it as a
@@ -935,23 +970,7 @@ else:
 
 cex_bias = "Bullish" if kpi.total_cex > 0 else "Bearish"
 cex_bias_color = "#26a69a" if kpi.total_cex > 0 else "#ef5350"
-
-st.markdown(
-    f'<div class="regime-badge {regime_class}">'
-    f'<div>'
-    f'<div class="regime-title" style="color:{regime_color};">{regime_emoji} {regime_text}</div>'
-    f'<div class="regime-sub">Spot ${spot:,.2f} vs Flip ${kpi.gamma_flip:,.2f}</div>'
-    f'</div>'
-    f'<div style="text-align:right;">'
-    f'<div style="font-size:0.8rem;color:#9ca3af;">Daily Bias</div>'
-    f'<div style="font-size:1rem;font-weight:700;color:{cex_bias_color};">{cex_bias} (CEX {_fmt_short(kpi.total_cex)})</div>'
-    f'</div>'
-    f'</div>' if kpi.gamma_flip else
-    f'<div class="regime-badge {regime_class}">'
-    f'<div class="regime-title" style="color:{regime_color};">{regime_emoji} {regime_text}</div>'
-    f'</div>',
-    unsafe_allow_html=True,
-)
+# regime badge rendered inside Legacy expander below
 
 # ── Key Levels Summary ──────────────────────────────────────────────────────
 
@@ -1084,6 +1103,25 @@ levels_html += '</div>'
 
 with st.expander("🧪 Sinyal Legacy (referensi)", expanded=not mode_fokus):
     st.caption("Panel lama — keputusan resmi ada di panel Keputusan 5 lapis")
+    st.markdown(
+        (
+            f'<div class="regime-badge {regime_class}">'
+            f'<div>'
+            f'<div class="regime-title" style="color:{regime_color};">{regime_emoji} {regime_text}</div>'
+            f'<div class="regime-sub">Spot ${spot:,.2f} vs Flip ${kpi.gamma_flip:,.2f}</div>'
+            f'</div>'
+            f'<div style="text-align:right;">'
+            f'<div style="font-size:0.8rem;color:#9ca3af;">Daily Bias</div>'
+            f'<div style="font-size:1rem;font-weight:700;color:{cex_bias_color};">{cex_bias} (CEX {_fmt_short(kpi.total_cex)})</div>'
+            f'</div>'
+            f'</div>'
+        ) if kpi.gamma_flip else (
+            f'<div class="regime-badge {regime_class}">'
+            f'<div class="regime-title" style="color:{regime_color};">{regime_emoji} {regime_text}</div>'
+            f'</div>'
+        ),
+        unsafe_allow_html=True,
+    )
     st.markdown(
         f'<div class="signal-box">'
         f'<div class="signal-header">'
@@ -1506,6 +1544,9 @@ st.markdown(
     ),
     unsafe_allow_html=True,
 )
+
+if _iv_holiday_block:
+    st.caption("Pasar AS tutup — history IV dijeda")
 
 # ATM IV big number + badge
 if atm_iv is not None:
