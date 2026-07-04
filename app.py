@@ -355,7 +355,7 @@ with ctrl_3:
     )
 
 with ctrl_4:
-    auto_interval = st.selectbox("Auto Refresh", list(REFRESH_INTERVALS.keys()), index=2)
+    auto_interval = st.selectbox("Auto Refresh", list(REFRESH_INTERVALS.keys()), index=0)
 
 with ctrl_5:
     oanda_price = st.number_input(
