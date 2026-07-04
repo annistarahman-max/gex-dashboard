@@ -1401,7 +1401,7 @@ fig_gex.add_trace(go.Bar(
 _spot_marker(fig_gex, spot, kpi.gamma_flip)
 _gex_cap = np.percentile(np.abs(agg["gex"].values), 95) * 1.3 if len(agg) > 0 else 1
 fig_gex.update_layout(xaxis_title="Strike Price", yaxis_title="Gamma Exposure ($)", yaxis_range=[-_gex_cap, _gex_cap], **_LAYOUT)
-st.plotly_chart(fig_gex, key="gex", config={"displayModeBar": False})
+st.plotly_chart(fig_gex, key="gex", config={"displayModeBar": "hover", "modeBarButtonsToRemove": ["lasso2d", "select2d", "zoomIn2d", "zoomOut2d"]})
 _pos_count = (agg["gex"] > 0).sum()
 _neg_count = (agg["gex"] < 0).sum()
 if _neg_count > _pos_count:
@@ -1456,7 +1456,7 @@ with st.expander("📊 VEX & CEX", expanded=not mode_fokus):
         _spot_marker(fig_vex, spot, kpi.gamma_flip)
         _vex_cap = np.percentile(np.abs(agg["vex"].values), 95) * 1.3 if len(agg) > 0 else 1
         fig_vex.update_layout(xaxis_title="Strike Price", yaxis_title="Vanna Exposure ($)", yaxis_range=[-_vex_cap, _vex_cap], **_LAYOUT)
-        st.plotly_chart(fig_vex, key="vex", config={"displayModeBar": False})
+        st.plotly_chart(fig_vex, key="vex", config={"displayModeBar": "hover", "modeBarButtonsToRemove": ["lasso2d", "select2d", "zoomIn2d", "zoomOut2d"]})
         if abs(kpi.total_vex) < 1e3:
             _interp("Netral — perubahan volatilitas tidak trigger hedging signifikan")
         elif kpi.total_vex > 0:
@@ -1501,7 +1501,7 @@ with st.expander("📊 VEX & CEX", expanded=not mode_fokus):
         _spot_marker(fig_cex, spot, kpi.gamma_flip)
         _cex_cap = np.percentile(np.abs(agg["cex"].values), 95) * 1.3 if len(agg) > 0 else 1
         fig_cex.update_layout(xaxis_title="Strike Price", yaxis_title="Charm Exposure ($)", yaxis_range=[-_cex_cap, _cex_cap], **_LAYOUT)
-        st.plotly_chart(fig_cex, key="cex", config={"displayModeBar": False})
+        st.plotly_chart(fig_cex, key="cex", config={"displayModeBar": "hover", "modeBarButtonsToRemove": ["lasso2d", "select2d", "zoomIn2d", "zoomOut2d"]})
         if kpi.total_cex < -1e6:
             _interp(f"Selling pressure harian kuat ({_fmt_short(kpi.total_cex)}) — bearish drift, hati-hati hold long")
         elif kpi.total_cex > 1e6:
@@ -1581,7 +1581,7 @@ with col_iv1:
             xaxis_title="Waktu (WIB)", yaxis_title="ATM IV (%)",
             showlegend=False, **_LAYOUT,
         )
-        st.plotly_chart(fig_iv_line, key="iv_line", config={"displayModeBar": False})
+        st.plotly_chart(fig_iv_line, key="iv_line", config={"displayModeBar": "hover", "modeBarButtonsToRemove": ["lasso2d", "select2d", "zoomIn2d", "zoomOut2d"]})
     else:
         st.markdown(
             '<div style="color:#6b7280;font-size:0.85rem;padding:30px 0;text-align:center;">'
@@ -1623,7 +1623,7 @@ with col_iv2:
             yaxis_range=[max(0, _skew_med * 0.7), _skew_med * 1.5],
             showlegend=False, **_LAYOUT,
         )
-        st.plotly_chart(fig_skew, key="iv_skew", config={"displayModeBar": False})
+        st.plotly_chart(fig_skew, key="iv_skew", config={"displayModeBar": "hover", "modeBarButtonsToRemove": ["lasso2d", "select2d", "zoomIn2d", "zoomOut2d"]})
         if _skew_excluded > 0:
             st.markdown(
                 f'<div style="font-size:0.72rem;color:#4b5563;margin-top:-8px;">'
@@ -1716,7 +1716,7 @@ with st.expander("🔥 Heatmap & Absolute Gamma", expanded=not mode_fokus):
         barmode="relative", xaxis_title="Strike Price",
         yaxis_title="Open Interest (Contracts)", yaxis_range=[-_oi_cap, _oi_cap], **_LAYOUT,
     )
-    st.plotly_chart(fig_abs, key="abs_gex", config={"displayModeBar": False})
+    st.plotly_chart(fig_abs, key="abs_gex", config={"displayModeBar": "hover", "modeBarButtonsToRemove": ["lasso2d", "select2d", "zoomIn2d", "zoomOut2d"]})
     total_call = agg["call_oi"].sum()
     total_put = agg["put_oi"].sum()
     pcr = total_put / total_call if total_call > 0 else 0
@@ -1760,7 +1760,7 @@ with st.expander("🔥 Heatmap & Absolute Gamma", expanded=not mode_fokus):
         xaxis_title="Strike Price", yaxis_title="Hedge Pressure Score",
         yaxis_range=[-1.1, 1.1], **_LAYOUT,
     )
-    st.plotly_chart(fig_hm, key="heatmap", config={"displayModeBar": False})
+    st.plotly_chart(fig_hm, key="heatmap", config={"displayModeBar": "hover", "modeBarButtonsToRemove": ["lasso2d", "select2d", "zoomIn2d", "zoomOut2d"]})
     max_strike = agg.loc[agg["gex"].idxmax(), "strike"] if len(agg) > 0 else 0
     _interp(f"Tekanan terkuat di strike ${max_strike:,.0f}" + (f" ({ul_label} ${max_strike * conv_ratio:,.0f})" if has_conversion else "") + " — perhatikan level ini")
     st.markdown(_CARD_END, unsafe_allow_html=True)
@@ -1793,7 +1793,7 @@ with st.expander("📈 Net Delta & OI", expanded=not mode_fokus):
     _spot_marker(fig_delta, spot, kpi.gamma_flip)
     _delta_cap = np.percentile(np.abs(agg["delta_exposure"].values), 95) * 1.3 if len(agg) > 0 else 1
     fig_delta.update_layout(xaxis_title="Strike Price", yaxis_title="Delta Exposure ($)", yaxis_range=[-_delta_cap, _delta_cap], **_LAYOUT)
-    st.plotly_chart(fig_delta, key="delta", config={"displayModeBar": False})
+    st.plotly_chart(fig_delta, key="delta", config={"displayModeBar": "hover", "modeBarButtonsToRemove": ["lasso2d", "select2d", "zoomIn2d", "zoomOut2d"]})
     if kpi.net_delta > 0:
         _interp(f"Dealer long delta ({_fmt_short(kpi.net_delta)}) — bullish hedge positioning, ada support dari dealer")
     else:
