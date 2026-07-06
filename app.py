@@ -249,14 +249,17 @@ CONVERT_MAP = {
 
 @st.cache_data(ttl=300)
 def _fetch_underlying_price(yf_ticker):
-    tk = yf.Ticker(yf_ticker)
-    info = tk.fast_info
-    price = getattr(info, "last_price", None)
-    if not price:
-        hist = tk.history(period="1d")
-        if not hist.empty:
-            price = float(hist["Close"].iloc[-1])
-    return float(price) if price else None
+    try:
+        tk = yf.Ticker(yf_ticker)
+        info = tk.fast_info
+        price = getattr(info, "last_price", None)
+        if not price:
+            hist = tk.history(period="1d")
+            if not hist.empty:
+                price = float(hist["Close"].iloc[-1])
+        return float(price) if price else None
+    except Exception:
+        return None
 
 
 def _get_conversion(ticker, spot):
@@ -279,13 +282,19 @@ provider = get_provider()
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def _cached_spot(tkr: str) -> float:
-    return provider.fetch_spot(tkr)
+def _cached_spot(tkr: str):
+    try:
+        return provider.fetch_spot(tkr)
+    except Exception:
+        return None
 
 
-@st.cache_data(ttl=180, show_spinner="Mengambil options chain...")
+@st.cache_data(ttl=300, show_spinner="Mengambil options chain...")
 def _cached_chain(tkr: str):
-    return provider.fetch_chain(tkr)
+    try:
+        return provider.fetch_chain(tkr)
+    except Exception:
+        return pd.DataFrame()
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -309,23 +318,43 @@ with ctrl_1:
         help="e.g. SPY, QQQ, AAPL, TSLA, NVDA, GLD",
     ).upper()
 
-spot = _cached_spot(ticker)
+spot_raw = _cached_spot(ticker)
+_fetch_err = spot_raw is None
+if not _fetch_err and spot_raw > 0:
+    st.session_state["_stale_spot"] = spot_raw
+    st.session_state["_stale_spot_ts"] = datetime.now(WIB).strftime("%H:%M WIB")
+spot = spot_raw if (spot_raw is not None and spot_raw > 0) \
+    else float(st.session_state.get("_stale_spot", 0))
+_using_stale_spot = _fetch_err and "_stale_spot" in st.session_state
+
 ul_price, ul_label, conv_ratio = _get_conversion(ticker, spot)
 has_conversion = ul_price is not None
 
 chain = _cached_chain(ticker)
+_chain_err = chain.empty
 
-if chain.empty or spot <= 0:
-    st.error(
-        "⚠️ Gagal mengambil data dari Yahoo Finance (options chain kosong atau "
-        "spot = 0). Kemungkinan rate-limit, koneksi bermasalah, atau ticker tanpa "
-        "options. Tunggu 1–2 menit lalu klik Refresh Now — JANGAN ambil keputusan "
-        "trading dari tampilan ini."
+if _fetch_err or _chain_err:
+    _stale_ts = st.session_state.get("_stale_spot_ts", "")
+    st.markdown(
+        '<div style="background:#1c1424;border:1px solid #7c3aed;border-radius:8px;'
+        'padding:14px 18px;margin-bottom:12px;">'
+        '<span style="font-size:1rem;font-weight:600;color:#c4b5fd;">'
+        '⏳ Yahoo Finance tidak merespons</span><br>'
+        '<span style="font-size:0.82rem;color:#9ca3af;">'
+        'Rate limit atau gangguan sementara — tunggu 2–5 menit lalu coba lagi. '
+        'Jangan ambil keputusan trading dari tampilan ini.'
+        '</span></div>',
+        unsafe_allow_html=True,
     )
-    if st.button("Refresh Now", key="refresh_empty"):
-        st.cache_data.clear()
-        st.rerun()
-    st.stop()
+    if _using_stale_spot and _stale_ts:
+        st.caption(f"Spot terakhir per {_stale_ts} — data baru belum tersedia")
+    _col_rl, _ = st.columns([1, 4])
+    with _col_rl:
+        if st.button("🔄 Coba Lagi", key="rl_retry"):
+            st.cache_data.clear()
+            st.rerun()
+    if _chain_err or spot <= 0:
+        st.stop()
 
 expiry_dates = sorted(chain["expiry"].dt.date.unique())
 expiry_labels = ["All Expiries"] + [d.strftime("%Y-%m-%d") for d in expiry_dates]
