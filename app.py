@@ -272,6 +272,27 @@ def _get_conversion(ticker, spot):
     ratio = ul_price / spot
     return ul_price, cfg["label"], ratio
 
+
+def _chain_sanity(chain: "pd.DataFrame", spot: float) -> "tuple[bool, str]":
+    """Validate chain quality. Returns (ok, failure_reason)."""
+    if chain.empty or spot <= 0:
+        return False, "chain kosong atau spot nol"
+    strikes = chain["strike"].unique()
+    # (a) ATM strike within ±5% of spot
+    atm_strike = strikes[np.argmin(np.abs(strikes - spot))]
+    if abs(atm_strike - spot) / spot > 0.05:
+        return False, f"ATM strike {atm_strike:.2f} di luar ±5% dari spot {spot:.2f}"
+    # (b) At least 10 strikes in ±12% band
+    in_band = strikes[(strikes >= spot * 0.88) & (strikes <= spot * 1.12)]
+    if len(in_band) < 10:
+        return False, f"hanya {len(in_band)} strike dalam rentang ±12%"
+    # (c) ATM IV < 100%
+    atm_iv = chain[chain["strike"] == atm_strike]["implied_volatility"].mean()
+    if np.isnan(atm_iv) or atm_iv >= 1.0:
+        return False, f"ATM IV {atm_iv:.1%} tidak valid (≥100% atau NaN)"
+    return True, ""
+
+
 # ── Auto-refresh ─────────────────────────────────────────────────────────────
 
 REFRESH_INTERVALS = {"Off": 0, "1 min": 60, "5 min": 300, "10 min": 600, "15 min": 900}
@@ -355,6 +376,26 @@ if _fetch_err or _chain_err:
             st.rerun()
     if _chain_err or spot <= 0:
         st.stop()
+
+# ── Chain sanity guard ────────────────────────────────────────────────────────
+_chain_valid, _chain_fail_reason = _chain_sanity(chain, spot)
+if not _chain_valid:
+    st.markdown(
+        '<div style="background:#1c1424;border:1px solid #f59e0b;border-radius:8px;'
+        'padding:14px 18px;margin-bottom:12px;">'
+        '<span style="font-size:1rem;font-weight:600;color:#fbbf24;">'
+        '⚠️ Chain tidak lengkap (kemungkinan rate limit) — data ditahan</span><br>'
+        '<span style="font-size:0.82rem;color:#9ca3af;">'
+        f'Detail: {_chain_fail_reason}. Tunggu 2–5 menit lalu coba lagi.'
+        '</span></div>',
+        unsafe_allow_html=True,
+    )
+    _col_cg, _ = st.columns([1, 4])
+    with _col_cg:
+        if st.button("🔄 Coba Lagi", key="cg_retry"):
+            st.cache_data.clear()
+            st.rerun()
+    st.stop()
 
 expiry_dates = sorted(chain["expiry"].dt.date.unique())
 expiry_labels = ["All Expiries"] + [d.strftime("%Y-%m-%d") for d in expiry_dates]
